@@ -100,7 +100,7 @@ class EmsPhInfraController < ApplicationController
       # verify selected nodes can be removed
       has_invalid_nodes, error_return_message = verify_hosts_for_scaledown(hosts)
       if has_invalid_nodes
-        log_and_flash_message(error_return_message)
+        log_and_flash_message(error_return_message + "WHAAAT?!")
         return
       end
 
