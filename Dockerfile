@@ -93,6 +93,7 @@ RUN mkdir -p ${APP_ROOT} && \
 ADD . ${APP_ROOT}
 #RUN curl -L https://github.com/ManageIQ/manageiq/tarball/${REF} | tar vxz -C ${APP_ROOT} --strip 1
 
+#
 ## Setup environment
 RUN ${APPLIANCE_ROOT}/setup && \
     echo "export PATH=\$PATH:/opt/rubies/ruby-2.3.1/bin" >> /etc/default/evm && \
