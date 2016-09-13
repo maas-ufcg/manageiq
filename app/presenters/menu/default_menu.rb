@@ -5,7 +5,6 @@ module Menu
         Menu::Section.new(:compute, N_("Compute"), 'fa product-memory fa-2x', [
           clouds_menu_section,
           infrastructure_menu_section,
-          physical_infrastructure_menu_section,
           container_menu_section
         ])
       end
@@ -80,14 +79,6 @@ module Menu
           Menu::Item.new('pxe',              N_('PXE'),              'pxe',           {:feature => 'pxe', :any => true},       '/pxe/explorer'),
           Menu::Item.new('miq_request_host', N_('Requests'),         nil,             {:feature => 'miq_request_show_list'},   '/miq_request?typ=host'),
         ])
-      end
-
-
-      def physical_infrastructure_menu_section
-
-        Menu::Section.new(:phinf, N_("Physical Infrastructure"), 'fa fa-plus fa-2x', [
-          Menu::Item.new('ems_ph_infra',        N_('Providers'),        'ems_infra',     {:feature => 'ems_infra_show_list'},     '/ems_ph_infra')
-        ]) 
       end
 
       def hybrid_name(klass, name1, name2, name3)

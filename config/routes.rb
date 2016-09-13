@@ -1024,49 +1024,6 @@ Vmdb::Application.routes.draw do
                save_post
     },
 
-
-    :ems_ph_infra                => {
-      :get  => %w(
-        dialog_load
-        discover
-        download_data
-        ems_ph_infra_form_fields
-        protect
-        show_list
-        tagging_edit
-        scaling
-        scaledown
-      ) +
-               compare_get,
-      :post => %w(
-        button
-        create
-        form_field_changed
-        listnav_search_selected
-        protect
-        quick_search
-        sections_field_changed
-        show
-        show_list
-        tag_edit_form_field_changed
-        tagging_edit
-        tl_chooser
-        tree_autoload_dynatree
-        tree_autoload_quads
-        update
-        wait_for_task
-        scaling
-        scaledown
-        x_show
-      ) +
-               adv_search_post +
-               compare_post +
-               dialog_runner_post +
-               discover_get_post +
-               exp_post +
-               save_post
-    },
-
     :ems_container            => {
       :get  => %w(
         download_data
