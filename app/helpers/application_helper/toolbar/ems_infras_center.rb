@@ -18,7 +18,7 @@ class ApplicationHelper::Toolbar::EmsInfrasCenter < ApplicationHelper::Toolbar::
         button(
           :ems_infra_discover,
           'fa fa-search fa-lg',
-          t = N_('Discover Physical Infrastructure Providers'),
+          t = N_('Discover Infrastructure Providers'),
           t,
           :url       => "/discover",
           :url_parms => "?discover_type=ems"),
@@ -26,7 +26,7 @@ class ApplicationHelper::Toolbar::EmsInfrasCenter < ApplicationHelper::Toolbar::
         button(
           :ems_infra_new,
           'pficon pficon-add-circle-o fa-lg',
-          t = N_('Add a New Physical Infrastructure Provider'),
+          t = N_('Add a New Infrastructure Provider'),
           t,
           :url => "/new"),
         button(
