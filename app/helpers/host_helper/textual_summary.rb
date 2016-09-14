@@ -6,13 +6,22 @@ module HostHelper::TextualSummary
   #
 
   def textual_group_properties
-    %i(hostname ipaddress ipmi_ipaddress custom_1 vmm_vendor_display model asset_tag service_tag osinfo
-       power_state lockdown_mode maintenance_mode devices network storage_adapters num_cpu num_cpu_cores
-       cpu_cores_per_socket memory guid)
+    #TODO Insert the type ::Lenovo::PhysicalInfraManager::Node
+    if @record.kind_of?(ManageIQ::Providers::Redhat::InfraManager::Host)
+      %i(hostname ipaddress osinfo power_state devices network storage_adapters num_cpu num_cpu_cores memory guid)
+    else
+      %i(hostname ipaddress ipmi_ipaddress custom_1 vmm_vendor_display model asset_tag service_tag osinfo
+         power_state lockdown_mode maintenance_mode devices network storage_adapters num_cpu num_cpu_cores
+         cpu_cores_per_socket memory guid)
+    end
   end
 
   def textual_group_relationships
-    %i(ems cluster availability_zone used_tenants storages resource_pools vms templates drift_history)
+    if @record.kind_of?(ManageIQ::Providers::Redhat::InfraManager::Host)
+      %i(ems cluster storages vms)
+    else
+      %i(ems cluster availability_zone used_tenants storages resource_pools vms templates drift_history)
+    end
   end
 
   def textual_group_storage_relationships
@@ -20,12 +29,20 @@ module HostHelper::TextualSummary
   end
 
   def textual_group_security
-    return nil if @record.is_vmware_esxi?
-    %i(users groups patches firewall_rules ssh_root)
+    if @record.kind_of?(ManageIQ::Providers::Redhat::InfraManager::Host)
+
+    else
+      return nil if @record.is_vmware_esxi?
+      %i(users groups patches firewall_rules ssh_root)
+    end
   end
 
   def textual_group_configuration
-    %i(guest_applications host_services filesystems advanced_settings)
+    if @record.kind_of?(ManageIQ::Providers::Redhat::InfraManager::Host)
+
+    else
+      %i(guest_applications host_services filesystems advanced_settings)
+    end
   end
 
   def textual_group_diagnostics
@@ -34,7 +51,11 @@ module HostHelper::TextualSummary
   end
 
   def textual_group_smart_management
-    %i(tags)
+    if @record.kind_of?(ManageIQ::Providers::Redhat::InfraManager::Host)
+
+    else
+      %i(tags)
+    end
   end
 
   def textual_group_miq_custom_attributes
@@ -46,7 +67,11 @@ module HostHelper::TextualSummary
   end
 
   def textual_group_authentications
-    textual_authentications(@record.authentication_userid_passwords + @record.authentication_key_pairs)
+    if @record.kind_of?(ManageIQ::Providers::Redhat::InfraManager::Host)
+
+    else
+      textual_authentications(@record.authentication_userid_passwords + @record.authentication_key_pairs)
+    end
   end
 
   def textual_group_cloud_services

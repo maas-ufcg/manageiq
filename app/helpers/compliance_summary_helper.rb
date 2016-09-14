@@ -1,6 +1,10 @@
 module ComplianceSummaryHelper
   def textual_group_compliance
-    %i(compliance_status compliance_history)
+    if @record.kind_of?(ManageIQ::Providers::Redhat::InfraManager::Host)
+
+    else
+      %i(compliance_status compliance_history)
+    end
   end
 
   def textual_compliance_status
