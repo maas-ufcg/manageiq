@@ -13,6 +13,8 @@ describe ManageIQ::Providers::Openstack::CloudManager::Refresher do
       with_cassette(@environment, @ems) do
         EmsRefresh.refresh(@ems)
         EmsRefresh.refresh(@ems.network_manager)
+        EmsRefresh.refresh(@ems.cinder_manager)
+        EmsRefresh.refresh(@ems.swift_manager)
       end
 
       assert_common
@@ -20,16 +22,13 @@ describe ManageIQ::Providers::Openstack::CloudManager::Refresher do
   end
 
   context "when configured with skips" do
-    before(:each) do
-      stub_settings(
-        :ems_refresh => {:openstack => {:inventory_ignore => [:cloud_volumes, :cloud_volume_snapshots]}}
-      )
-    end
 
     it "will not parse the ignored items" do
       with_cassette(@environment, @ems) do
         EmsRefresh.refresh(@ems)
         EmsRefresh.refresh(@ems.network_manager)
+        EmsRefresh.refresh(@ems.cinder_manager)
+        EmsRefresh.refresh(@ems.swift_manager)
       end
 
       assert_with_skips
@@ -37,11 +36,13 @@ describe ManageIQ::Providers::Openstack::CloudManager::Refresher do
   end
 
   context "when paired with a infrastructure provider" do
-    # assumes all cloud instances are on single host => dhcp-8-99-240.cloudforms.lab.eng.rdu2.redhat.com
+    # assumes all cloud instances are on single host accessible at the same address as @ems
     before(:each) do
       @cpu_speed = 2800
       @hardware = FactoryGirl.create(:hardware, :cpu_speed => @cpu_speed, :cpu_sockets => 2, :cpu_cores_per_socket => 4, :cpu_total_cores => 8)
-      @infra_host = FactoryGirl.create(:host_openstack_infra, :hardware => @hardware, :hypervisor_hostname => "dhcp-8-99-240.cloudforms.lab.eng.rdu2.redhat.com")
+      @infra_host = FactoryGirl.create(:host_openstack_infra,
+                                       :hardware            => @hardware,
+                                       :hypervisor_hostname => @ems.openstack_handle.address)
       @provider = FactoryGirl.create(:provider_openstack, :name => "undercloud")
       @infra = FactoryGirl.create(:ems_openstack_infra_with_stack, :name => "undercloud", :provider => @provider)
       @infra.hosts << @infra_host
@@ -54,6 +55,8 @@ describe ManageIQ::Providers::Openstack::CloudManager::Refresher do
       with_cassette(@environment, @ems) do
         EmsRefresh.refresh(@ems)
         EmsRefresh.refresh(@ems.network_manager)
+        EmsRefresh.refresh(@ems.cinder_manager)
+        EmsRefresh.refresh(@ems.swift_manager)
       end
 
       ManageIQ::Providers::Openstack::CloudManager::Vm.all.each do |vm|

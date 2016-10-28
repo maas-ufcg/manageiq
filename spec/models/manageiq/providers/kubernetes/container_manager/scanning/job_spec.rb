@@ -62,7 +62,7 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job do
 
     it "#initialize" do
       image = FactoryGirl.create(:container_image, :ext_management_system => @ems)
-      job = @ems.scan_job_create(image.class.name, image.id)
+      job = @ems.raw_scan_job_create(image)
       expect(job).to have_attributes(
         :dispatch_status => "pending",
         :state           => "waiting_to_start",
@@ -101,7 +101,7 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job do
         @job.signal(:data, '<summary><syncmetadata></syncmetadata></summary>')
       end
 
-      @job = @image.scan
+      @job = @ems.raw_scan_job_create(@image)
       allow(MiqQueue).to receive(:put_unless_exists) do |args|
         @job.signal(*args[:args])
       end
@@ -144,20 +144,34 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job do
       end
     end
 
+    it 'should add correct environment variables' do
+      att_name = 'http_proxy'
+      my_value = "MY_TEST_VALUE"
+      @ems.custom_attributes.create(:section => described_class::ATTRIBUTE_SECTION,
+                                    :name    => att_name,
+                                    :value   => my_value)
+      allow_any_instance_of(described_class).to receive_messages(:kubernetes_client => MockKubeClient.new)
+      kc = @job.kubernetes_client
+      secret_name = kc.get_service_account[:imagePullSecrets][0][:name]
+      pod = @job.send(:pod_definition, secret_name)
+      expect(pod[:spec][:containers][0][:env][0][:name]).to eq(att_name.upcase)
+      expect(pod[:spec][:containers][0][:env][0][:value]).to eq(my_value)
+    end
+
     it 'should send correct dockercfg secrets' do
       allow_any_instance_of(described_class).to receive_messages(:kubernetes_client => MockKubeClient.new)
       kc = @job.kubernetes_client
       secret_name = kc.get_service_account[:imagePullSecrets][0][:name]
-      pod = @job.send(:pod_definition)
+      pod = @job.send(:pod_definition, secret_name)
       expect(pod[:spec][:containers][0][:command]).to include(
         "--dockercfg=" + described_class::INSPECTOR_ADMIN_SECRET_PATH + secret_name + "/.dockercfg")
       expect(pod[:spec][:containers][0][:volumeMounts]).to include(
-        Kubeclient::Pod.new(
+        Kubeclient::Resource.new(
           :name      => "inspector-admin-secret",
           :mountPath => described_class::INSPECTOR_ADMIN_SECRET_PATH + secret_name,
           :readOnly  => true))
       expect(pod[:spec][:volumes]).to include(
-        Kubeclient::Pod.new(
+        Kubeclient::Resource.new(
           :name   => "inspector-admin-secret",
           :secret => {:secretName => secret_name}))
     end
@@ -176,11 +190,9 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job do
     end
 
     context 'when create pod throws exception' do
-      CODE = 0
-      CLIENT_MESSAGE = 'error'.freeze
       before(:each) do
         allow_any_instance_of(MockKubeClient).to receive(:create_pod) do |_instance, *_args|
-          raise KubeException.new(CODE, CLIENT_MESSAGE, nil)
+          raise KubeException.new(0, 'error', nil)
         end
       end
 
@@ -188,8 +200,22 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job do
         @job.signal(:start)
         expect(@job.state).to eq 'finished'
         expect(@job.status).to eq 'error'
-        expect(@job.message).to eq "pod creation for management-infra/manageiq-img-scan-#{@job.guid[0..4]}" \
-                               " failed: HTTP status code #{CODE}, #{CLIENT_MESSAGE}"
+        expect(@job.message).to eq "pod creation for [management-infra/manageiq-img-scan-#{@job.guid[0..4]}] failed"
+      end
+    end
+
+    context 'when getting the service account throws exception' do
+      before(:each) do
+        allow_any_instance_of(MockKubeClient).to receive(:get_service_account) do |_instance, *_args|
+          raise KubeException.new(0, 'error', nil)
+        end
+      end
+
+      it 'should report the error' do
+        @job.signal(:start)
+        expect(@job.state).to eq 'finished'
+        expect(@job.status).to eq 'error'
+        expect(@job.message).to eq "getting inspector-admin secret failed"
       end
     end
 

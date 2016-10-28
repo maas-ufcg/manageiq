@@ -151,8 +151,15 @@ module ManageIQ::Providers
         process_collection(instances, :vms) { |instance| parse_instance(instance) }
       end
 
+      # The underlying method that gathers these images is a bit brittle.
+      # Consequently, if it raises an error we just log it and move on so
+      # that it doesn't affect the rest of inventory collection.
+      #
       def get_images
         images = gather_data_for_this_region(@sas, 'list_all_private_images')
+      rescue Azure::Armrest::ApiException => err
+        _log.warn("Unable to collect Azure private images for: [#{@ems.name}] - [#{@ems.id}]: #{err.message}")
+      else
         process_collection(images, :vms) { |image| parse_image(image) }
       end
 
@@ -346,21 +353,15 @@ module ManageIQ::Providers
       end
 
       def download_template(uri)
-        require 'open-uri'
+        options = {
+          :method      => 'get',
+          :url         => uri,
+          :proxy       => @config.proxy,
+          :ssl_version => @config.ssl_version,
+          :ssl_verify  => @config.ssl_verify
+        }
 
-        if @config.proxy.blank?
-          open(uri) { |f| f.read }
-        else
-          proxy = Addressable::URI.parse(@config.proxy)
-          proxy_url = "#{proxy.scheme}://#{proxy.host}:#{proxy.port}"
-
-          if proxy.user.blank?
-            open(uri, :proxy => proxy_url) { |f| f.read }
-          else
-            auth_array = [proxy_url, proxy.user, proxy.password]
-            open(uri.to_s, :proxy_http_basic_authentication => auth_array) { |f| f.read }
-          end
-        end
+        RestClient::Request.execute(options).body
       rescue => e
         _log.error("Failed to download Azure template #{uri}. Reason: #{e.inspect}")
         nil

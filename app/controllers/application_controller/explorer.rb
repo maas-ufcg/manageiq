@@ -51,6 +51,8 @@ module ApplicationController::Explorer
     'tag'          => :s2, 'timeline'         => :s2, 'resize'          => :s2,
     'live_migrate' => :s2, 'attach'           => :s2, 'detach'          => :s2,
     'evacuate'     => :s2, 'service_dialog'   => :s2,
+    'associate_floating_ip'    => :s2,
+    'disassociate_floating_ip' => :s2,
 
     # specials
     'perf'         => :show,
@@ -62,13 +64,13 @@ module ApplicationController::Explorer
   def x_button
     model, action = pressed2model_action(params[:pressed])
 
-    allowed_models = %w(common image instance vm miq_template provider storage configscript)
+    allowed_models = %w(common image instance vm miq_template provider storage configscript infra_networking)
     raise ActionController::RoutingError.new('invalid button action') unless
       allowed_models.include?(model)
 
-    # guard this 'router' by matching against a list of allowed actions
-    raise ActionController::RoutingError.new('invalid button action') unless
-      X_BUTTON_ALLOWED_ACTIONS.key?(action)
+    unless X_BUTTON_ALLOWED_ACTIONS.key?(action)
+      raise ActionController::RoutingError, _('invalid button action')
+    end
 
     @explorer = true
 
@@ -80,13 +82,16 @@ module ApplicationController::Explorer
     elsif X_BUTTON_ALLOWED_ACTIONS[action] == :s2
       # don't need to set params[:id] and do find_checked_items for methods
       # like ownership, the code in those methods handle it
-      if %w(edit right_size resize attach detach live_migrate evacuate).include?(action)
+      if %w(edit right_size resize attach detach live_migrate evacuate
+            associate_floating_ip disassociate_floating_ip).include?(action)
         @_params[:id] = (params[:id] ? [params[:id]] : find_checked_items)[0]
       end
       if ['protect', 'tag'].include?(action)
         case model
         when 'storage'
           send(method, Storage)
+        when 'infra_networking'
+          send(method, Switch)
         else
           send(method, VmOrTemplate)
         end
@@ -134,6 +139,16 @@ module ApplicationController::Explorer
   end
 
   private ############################
+
+  def generic_x_button(whitelist)
+    @sb[:action] = action = params[:pressed]
+
+    unless whitelist.key?(action)
+      raise ActionController::RoutingError, _('invalid button action')
+    end
+
+    send(whitelist[action])
+  end
 
   # Add an item to the tree history array
   def x_history_add_item(options)

@@ -26,12 +26,11 @@ module MiqAeCustomizationController::Dialogs
     @_params[:typ] = ""
     get_field_types
 
-    # Use JS to update the display
-    render :update do |page|
-      page << javascript_prologue
-      if @flash_array
-        page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-      else
+    if @flash_array
+      javascript_flash(:spinner_off => true)
+    else
+      render :update do |page|
+        page << javascript_prologue
         page.replace_html(@refresh_div, :partial => @refresh_partial, :locals => {:entry => nil}) if @refresh_div
         changed = (@edit[:new] != @edit[:current])
         page.replace_html("custom_left_cell", :partial => "dialog_edit_tree")
@@ -59,8 +58,8 @@ module MiqAeCustomizationController::Dialogs
                                                                                                       params[:field_sort_by] || params[:field_sort_order] || params[:field_dynamic]
         end
         page << "miqInitDashboardCols();"
+        page << "miqSparkle(false);"
       end
-      page << "miqSparkle(false);"
     end
   end
 
@@ -181,9 +180,7 @@ module MiqAeCustomizationController::Dialogs
       replace_right_cell(x_node, [:dialog_edit])
 
     else
-      render_flash do |page|
-        page << "miqSparkle(false);"
-      end
+      javascript_flash(:spinner_off => true)
     end
   end
 
@@ -219,7 +216,7 @@ module MiqAeCustomizationController::Dialogs
 
       begin
         dialog_set_record_vars(dialog)
-      rescue StandardError => @bang
+      rescue => @bang
         add_flash(@bang.message, :error)
         @changed = true
         render_flash
@@ -479,9 +476,7 @@ module MiqAeCustomizationController::Dialogs
       if entry_value != "" && entry_description != ""
         if key[:values].include?([params["entry"]["value"], params["entry"]["description"]])
           add_flash(_("%{field} '%{value}' is already in use") % {:field => params["entry"]["description"], :value => params["entry"]["value"]}, :error)
-          render_flash do |page|
-            page << "$('#entry_value').focus();"
-          end
+          javascript_flash(:focus => 'entry_value')
           return
         else
           key[:values].push([params["entry"]["value"], params["entry"]["description"]])
@@ -490,9 +485,7 @@ module MiqAeCustomizationController::Dialogs
       else
         add_flash(_("Value and Description fields can't be blank"), :error)
         focus_field = entry_value == "" ? "entry_value" : "entry_description"
-        render_flash do |page|
-          page << "$('##{focus_field}').focus();"
-        end
+        javascript_flash(:focus => focus_field)
         return
       end
     else
@@ -501,9 +494,7 @@ module MiqAeCustomizationController::Dialogs
            entry[1] == params["entry"]["description"]
           add_flash(_("%{field} '%{value}' is already in use") % {:field => params["entry"]["description"], :value => params["entry"]["value"]}, :error)
 
-          render_flash do |page|
-            page << "$('#entry_value').focus();"
-          end
+          javascript_flash(:focus => 'entry_value')
           return
         else
           if i == params["entry"]["id"].to_i
@@ -525,13 +516,13 @@ module MiqAeCustomizationController::Dialogs
       page << javascript_for_miq_button_visibility(changed)
 
       # replace select tag of default values
-      url = url_for(:action => 'dialog_form_field_changed', :id => "#{@record.id || "new"}")
+      url = url_for(:action => 'dialog_form_field_changed', :id => (@record.id.to_s || "new"))
       none =  [['<None>', nil]]
       values = key[:values].empty? ? none : none + key[:values].collect(&:reverse)
       selected = @edit[:field_default_value]
       page << "$('#field_default_value').next('.bootstrap-select').remove();"
       page.replace("field_default_value",
-                   :text => "#{select_tag('field_default_value', options_for_select(values, selected), 'data-miq_observe' => {:interval => '.5', :url => url}.to_json)}")
+                   :text => select_tag('field_default_value', options_for_select(values, selected), 'data-miq_observe' => {:interval => '.5', :url => url}.to_json).to_s)
       page << "$('#field_default_value').selectpicker();"
     end
   end
@@ -565,7 +556,7 @@ module MiqAeCustomizationController::Dialogs
       page << javascript_for_miq_button_visibility(changed)
 
       # replace select tag of default values
-      url = url_for(:action => 'dialog_form_field_changed', :id => "#{@record.id || "new"}")
+      url = url_for(:action => 'dialog_form_field_changed', :id => (@record.id.to_s || "new"))
       none =  [['<None>', nil]]
       values = key[:values].empty? ? none : none + key[:values].collect(&:reverse)
       selected = @edit[:field_default_value]
@@ -785,7 +776,7 @@ module MiqAeCustomizationController::Dialogs
 
     base_node = TreeNodeBuilder.generic_tree_node(
       "root",
-      "#{@edit[:new][:label] || _('[New Dialog]')}",
+      (@edit[:new][:label].to_s || _('[New Dialog]')),
       "dialog.png",
       @edit[:new][:description] || @edit[:new][:label],
       :expand => true
@@ -793,7 +784,7 @@ module MiqAeCustomizationController::Dialogs
 
     base_node[:children] = tab_nodes unless tab_nodes.empty?
 
-    @dialog_edit_tree = base_node.to_json # JSON object for tree loading
+    @dialog_edit_tree = TreeBuilder.convert_bs_tree(base_node).to_json # JSON object for tree loading
 
     x_node_set("root", :dialog_edit_tree) unless x_node(:dialog_edit_tree)
   end
@@ -871,11 +862,6 @@ module MiqAeCustomizationController::Dialogs
       @edit[field_key] = key[param_key] = params[field_key] if params[field_key]
     end
 
-    copy_checkbox_field_param = proc do |param_key|
-      field_key = ('field_' + param_key.to_s).to_sym
-      @edit[field_key] = key[param_key] = params[field_key].to_s == '1' if params[field_key].present?
-    end
-
     [:label, :name, :description].each { |key| copy_field_param.call(key) }
 
     # new dropdown/radio is being added set default options OR if existing field type has been changed to dropdown/radio
@@ -898,15 +884,11 @@ module MiqAeCustomizationController::Dialogs
     @edit[:field_values] ||= key[:values] = []
 
     copy_field_param.call(:entry_point)
-    copy_checkbox_field_param.call(:load_on_init)
-    copy_checkbox_field_param.call(:show_refresh_button)
-    copy_checkbox_field_param.call(:past_dates)
-    copy_checkbox_field_param.call(:reconfigurable)
-    copy_checkbox_field_param.call(:dynamic)
-    copy_checkbox_field_param.call(:visible)
-    copy_checkbox_field_param.call(:read_only)
-    copy_checkbox_field_param.call(:auto_refresh)
-    copy_checkbox_field_param.call(:trigger_auto_refresh)
+    [:load_on_init, :show_refresh_button, :past_dates, :reconfigurable, :dynamic, :visible, :read_only, :auto_refresh,
+     :trigger_auto_refresh].each do |param_key| # save checkbox fields in session
+      field_key = ('field_' + param_key.to_s).to_sym
+      @edit[field_key] = key[param_key] = params[field_key].to_s == '1' if params[field_key].present?
+    end
 
     [:data_typ, :required, :sort_by, :sort_by, :sort_order].each { |key| copy_field_param.call(key) }
 

@@ -293,7 +293,7 @@ class MiqRequestController < ApplicationController
   def prov_load_tab
     if @options && @options[:current_tab_key] == :purpose # Need to build again for purpose tab
       fld = @options[:wf].kind_of?(MiqHostProvisionWorkflow) ? "tag_ids" : "vm_tags"
-      build_tags_tree(@options[:wf], @options["#{fld}".to_sym], false)
+      build_tags_tree(@options[:wf], @options[fld.to_s.to_sym], false)
     end
     # need to build host list view, to display on show screen
     @options[:host_sortdir] = "ASC"
@@ -318,7 +318,7 @@ class MiqRequestController < ApplicationController
     begin
       method = WORKFLOW_METHOD_WHITELIST[params[:field]]
       @edit[:wf].send(method, @edit[:new]) unless method.nil?
-    rescue StandardError => bang
+    rescue => bang
       add_flash(_("Error retrieving LDAP info: %{error_message}") % {:error_message => bang.message}, :error)
       javascript_flash
     else
@@ -557,7 +557,7 @@ class MiqRequestController < ApplicationController
       end
       begin
         miq_request.public_send(task.to_sym) if miq_request.respond_to?(task)    # Run the task
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("%{model} \"%{name}\": Error during '%{task}': %{message}") %
                       {:model   => ui_lookup(:model => "MiqRequest"),
                        :name    => request_name,

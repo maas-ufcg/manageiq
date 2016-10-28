@@ -165,7 +165,7 @@ class MiqCapacityController < ApplicationController
   private :planning_wizard_get_vms_records
 
   def planning_wizard_get_vms(filter_type, filter_value)
-    vms = planning_wizard_get_vms_records(filter_type, filter_value)
+    vms = Rbac.filtered(planning_wizard_get_vms_records(filter_type, filter_value))
     vms.each_with_object({}) do |v, h|
       description = v.ext_management_system ? "#{v.ext_management_system.name}:#{v.name}" : v.name
       h[v.id.to_s] = description
@@ -623,7 +623,13 @@ class MiqCapacityController < ApplicationController
     r = proc { |opts| render_to_string(opts) }
 
     presenter[:osf_node] = x_node
-    presenter.update(:main_div, r[:partial => 'bottlenecks_tabs'])
+    if params.keys.any? { |param| param.include?('tl_report') }
+      presenter.replace(:bottlenecks_report_div, r[:partial => 'bottlenecks_report'])
+    elsif params.keys.any? { |param| param.include?('tl_summ') }
+      presenter.replace(:bottlenecks_summary_div, r[:partial => 'bottlenecks_summary'])
+    else
+      presenter.update(:main_div, r[:partial => 'bottlenecks_tabs'])
+    end
     presenter[:build_calendar] = true
     presenter[:right_cell_text] = @right_cell_text
 
@@ -714,7 +720,7 @@ class MiqCapacityController < ApplicationController
 
       begin
         @sb[:bottlenecks][:report].generate_table(:userid => session[:userid])
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("Error building timeline %{error_message}") % {:error_message => bang.message}, :error)
       else
         bottleneck_tl_to_xml
@@ -764,10 +770,14 @@ class MiqCapacityController < ApplicationController
     selected_node = x_node(name)
     if type == :bottlenecks
       @right_cell_text = _("Bottlenecks Summary")
-      @bottlenecks_tree = TreeBuilderUtilization.new(name, type, @sb, true, selected_node)
+      @bottlenecks_tree = TreeBuilderUtilization.new(
+        name, type, @sb, true, :selected_node => selected_node
+      )
     else
       @right_cell_text = _("Utilization Summary")
-      @utilization_tree = TreeBuilderUtilization.new(name, type, @sb, true, selected_node)
+      @utilization_tree = TreeBuilderUtilization.new(
+        name, type, @sb, true, :selected_node => selected_node
+      )
     end
   end
 

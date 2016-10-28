@@ -6,7 +6,6 @@ module Api
       #
 
       def show
-        validate_api_action
         if @req.subcollection
           render_collection_type @req.subcollection.to_sym, @req.s_id, true
         else
@@ -15,7 +14,6 @@ module Api
       end
 
       def update
-        validate_api_action
         if @req.subcollection
           render_normal_update @req.collection.to_sym, update_collection(@req.subcollection.to_sym, @req.s_id, true)
         else
@@ -24,13 +22,16 @@ module Api
       end
 
       def destroy
-        validate_api_action
         if @req.subcollection
           delete_subcollection_resource @req.subcollection.to_sym, @req.s_id
         else
-          send(target_resource_method(false, @req.collection.to_sym, :delete), @req.collection.to_sym, @req.c_id)
+          delete_resource(@req.collection.to_sym, @req.c_id)
         end
         render_normal_destroy
+      end
+
+      def options
+        render_options(@req.collection)
       end
 
       #
@@ -61,6 +62,20 @@ module Api
       end
 
       alias_method :create_resource, :add_resource
+
+      def query_resource(type, id, data)
+        unless id
+          data_spec = data.collect { |key, val| "#{key}=#{val}" }.join(", ")
+          raise NotFoundError, "Invalid #{type} resource specified - #{data_spec}"
+        end
+        resource = resource_search(id, type, collection_class(type))
+        opts = {
+          :name             => type.to_s,
+          :is_subcollection => false,
+          :expand_resources => true
+        }
+        resource_to_jbuilder(type, type, resource, opts).attributes!
+      end
 
       def edit_resource(type, id, data)
         klass = collection_class(type)
@@ -100,6 +115,7 @@ module Api
           raise BadRequestError, "Must specify an id for retiring a #{type} resource"
         end
       end
+      alias generic_retire_resource retire_resource
 
       def custom_action_resource(type, id, data = nil)
         action = @req.action.downcase
@@ -230,6 +246,10 @@ module Api
         workflow = ResourceActionWorkflow.new({}, @auth_user_obj, resource_action, :target => service_template)
         service_request.each { |key, value| workflow.set_value(key, value) } if service_request.present?
         workflow
+      end
+
+      def validate_id(id, klass)
+        raise NotFoundError, "Invalid #{klass} id #{id} specified" unless id.kind_of?(Integer) || id =~ /\A\d+\z/
       end
     end
   end

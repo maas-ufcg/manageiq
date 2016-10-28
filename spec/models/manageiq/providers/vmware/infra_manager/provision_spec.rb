@@ -15,7 +15,7 @@ describe ManageIQ::Providers::Vmware::InfraManager::Provision do
 
     context "VMware provisioning" do
       before(:each) do
-        @ems         = FactoryGirl.create(:ems_vmware_with_authentication)
+        @ems         = FactoryGirl.create(:ems_vmware_with_authentication, :api_version => '6.0')
         @vm_template = FactoryGirl.create(:template_vmware, :name => "template1", :ext_management_system => @ems, :operating_system => @os, :cpu_limit => -1, :cpu_reserve => 0)
         @vm          = FactoryGirl.create(:vm_vmware, :name => "vm1", :location => "abc/def.vmx")
         @pr          = FactoryGirl.create(:miq_provision_request, :requester => @admin, :src_vm_id => @vm_template.id)
@@ -147,14 +147,6 @@ describe ManageIQ::Providers::Vmware::InfraManager::Provision do
           FactoryGirl.create(:ems_folder, :name => 'vm', :ems_id => @ems.id).tap { |v| v.parent = dc }
         end
 
-        let(:discovered_vm_folder) do
-          FactoryGirl.create(:ems_folder, :name => 'Discovered virtual machine', :ems_id => @ems.id).tap { |f| f.parent = vm_folder }
-        end
-
-        let(:discovered_vm_folder_nested) do
-          FactoryGirl.create(:ems_folder, :name => 'Discovered virtual machine', :ems_id => @ems.id).tap { |f| f.parent = vm_folder_nested }
-        end
-
         let(:dest_host_nested) do
           FactoryGirl.create(:host_vmware, :ext_management_system => @ems).tap { |h| h.parent = dc_nested }
         end
@@ -168,18 +160,10 @@ describe ManageIQ::Providers::Vmware::InfraManager::Provision do
           expect(@vm_prov.dest_folder).to eq(user_folder)
         end
 
-        it "uses 'Discoverd virtual machine' folder in destination host" do
-          discovered_vm_folder
-          @vm_prov.options[:dest_host] = [dest_host.id, dest_host.name]
-          expect(@vm_prov.dest_folder).to eq(discovered_vm_folder)
-        end
-
-        it "uses a nested 'Discovered virtual machine' folder in destination host" do
-          discovered_vm_folder_nested
+        it "correctly locates a nested folder in destination host" do
           @vm_prov.options[:dest_host] = [dest_host_nested.id, dest_host_nested.name]
           parent_datacenter = dest_host_nested.parent_datacenter
           expect(parent_datacenter.folder_path).to eq("Datacenters/nested/testing/#{parent_datacenter.name}")
-          expect(@vm_prov.dest_folder).to eq(discovered_vm_folder_nested)
         end
 
         it "uses vm folder in destination host" do
@@ -210,8 +194,15 @@ describe ManageIQ::Providers::Vmware::InfraManager::Provision do
           expect(@vm_prov.dest_resource_pool).to eq(resource_pool)
         end
 
+        it "returns a resource_pool if one is passed in" do
+          expect(ResourcePool).to receive(:find_by).and_return(:resource_pool)
+          expect(@vm_prov).to receive(:default_resource_pool).never
+          @vm_prov.dest_resource_pool
+        end
+
         it "uses the resource pool from the cluster" do
-          @vm_prov.options[:dest_host] = [dest_host_with_cluster.id, dest_host_with_cluster.name]
+          @vm_prov.options[:dest_host]    = [dest_host_with_cluster.id, dest_host_with_cluster.name]
+          @vm_prov.options[:dest_cluster] = [cluster.id, cluster.name]
           expect(@vm_prov.dest_resource_pool).to eq(cluster.default_resource_pool)
         end
 
@@ -221,15 +212,39 @@ describe ManageIQ::Providers::Vmware::InfraManager::Provision do
         end
       end
 
+      context "#dest_storage_profile" do
+        let(:storage_profile) { FactoryGirl.create(:storage_profile, :name => "Gold") }
+
+        it "returns nil if no placement_storage_profile is given" do
+          @vm_prov.options[:placement_storage_profile] = nil
+          expect(@vm_prov.dest_storage_profile).to be_nil
+        end
+
+        it "returns nil if ems api_version < 5.5" do
+          @vm_prov.source.ext_management_system.api_version = '5.1'
+          @vm_prov.options[:placement_storage_profile] = [storage_profile.id, storage_profile.name]
+          expect(@vm_prov.dest_storage_profile).to be_nil
+        end
+
+        it "returns a storage profile" do
+          @vm_prov.options[:placement_storage_profile] = [storage_profile.id, storage_profile.name]
+          expect(@vm_prov.dest_storage_profile).to eq(storage_profile)
+        end
+      end
+
       context "#start_clone" do
         before(:each) do
           ds_mor = "datastore-0"
           storage = FactoryGirl.create(:storage_nfs, :ems_ref => ds_mor, :ems_ref_obj => ds_mor)
 
           Array.new(2) do |i|
+            cluster_mor = "cluster-#{i}"
+            cluster     = FactoryGirl.create(:ems_cluster, :ems_ref => cluster_mor)
+
             host_mor = "host-#{i}"
             host_props = {
               :ext_management_system => @ems,
+              :ems_cluster           => cluster,
               :ems_ref               => host_mor,
               :ems_ref_obj           => host_mor
             }
@@ -270,6 +285,51 @@ describe ManageIQ::Providers::Vmware::InfraManager::Provision do
 
           result = @vm_prov.start_clone clone_opts
           expect(result).to eq(task_mor)
+        end
+
+        it "uses the right ems_ref when given a cluster" do
+          dest_cluster_mor   = "cluster-1"
+          dest_datastore_mor = "datastore-1"
+          task_mor           = "task-1"
+
+          clone_opts = {
+            :name      => @target_vm_name,
+            :cluster   => EmsCluster.find_by(:ems_ref => dest_cluster_mor),
+            :datastore => Storage.first
+          }
+
+          expected_vim_clone_opts = {
+            :name          => @target_vm_name,
+            :wait          => false,
+            :template      => false,
+            :transform     => nil,
+            :config        => nil,
+            :customization => nil,
+            :linked_clone  => nil,
+            :datastore     => dest_datastore_mor
+          }
+
+          allow(@vm_prov).to receive(:clone_vm).with(expected_vim_clone_opts).and_return(task_mor)
+
+          result = @vm_prov.start_clone clone_opts
+          expect(result).to eq(task_mor)
+        end
+      end
+
+      describe '#get_next_vm_name' do
+        before do
+          @vm_prov.update_attributes(:options => @options.merge(:miq_force_unique_name => true))
+          allow(MiqRegion).to receive_message_chain('my_region.next_naming_sequence').and_return(123)
+        end
+
+        it 'does not add "_" in name' do
+          allow(MiqAeEngine).to receive(:resolve_automation_object).and_return(double(:root => 'myvm'))
+          expect(@vm_prov.get_next_vm_name).to eq('myvm0123')
+        end
+
+        it 'keeps "_" in name' do
+          allow(MiqAeEngine).to receive(:resolve_automation_object).and_return(double(:root => 'myvm_'))
+          expect(@vm_prov.get_next_vm_name).to eq('myvm_0123')
         end
       end
     end

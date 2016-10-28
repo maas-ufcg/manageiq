@@ -30,7 +30,7 @@ module Api
       end
 
       def put_resource(type, id)
-        send(target_resource_method(false, type, "edit"), type, id, @req.json_body)
+        edit_resource(type, id, @req.json_body)
       end
 
       #
@@ -63,7 +63,7 @@ module Api
             patched_attrs[attr] = nil if action == "remove"
           end
         end
-        send(target_resource_method(false, type, "edit"), type, id, patched_attrs)
+        edit_resource(type, id, patched_attrs)
       end
 
       def delete_subcollection_resource(type, id = nil)
@@ -87,8 +87,6 @@ module Api
           "#{type}_#{action}_resource"
         else
           target = "#{action}_resource"
-          typed_target = "#{target}_#{type}"
-          return typed_target if respond_to?(typed_target)
           return target if respond_to?(target)
           collection_config.custom_actions?(type) ? "custom_action_resource" : "undefined_api_method"
         end
@@ -110,12 +108,7 @@ module Api
       end
 
       def json_body_resource
-        resource = @req.json_body["resource"]
-        unless resource
-          resource = @req.json_body.dup
-          resource.delete("action")
-        end
-        resource
+        @req.json_body["resource"] || @req.json_body.except("action")
       end
 
       def update_one_collection(is_subcollection, target, type, id, resource)
@@ -136,8 +129,11 @@ module Api
           next if r.blank?
 
           rid = parse_id(r, type)
-          if rid && %w(create add).include?(action)
+          create_or_add_action = %w(create add).include?(action)
+          if rid && create_or_add_action
             raise BadRequestError, "Resource id or href should not be specified for creating a new #{type}"
+          elsif !rid && !create_or_add_action
+            rid = parse_by_attr(r, type)
           end
           r.except!(*ID_ATTRS) if rid
           processed += 1

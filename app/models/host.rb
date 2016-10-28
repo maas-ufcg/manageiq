@@ -16,6 +16,7 @@ class Host < ApplicationRecord
   include NewWithTypeStiMixin
   include VirtualTotalMixin
   include TenantIdentityMixin
+  include SupportsFeatureMixin
 
   VENDOR_TYPES = {
     # DB            Displayed
@@ -116,14 +117,13 @@ class Host < ApplicationRecord
 
   virtual_column :os_image_name,                :type => :string,      :uses => [:operating_system, :hardware]
   virtual_column :platform,                     :type => :string,      :uses => [:operating_system, :hardware]
-  virtual_column :v_owning_cluster,             :type => :string,      :uses => :ems_cluster
+  virtual_delegate :v_owning_cluster, :to => "ems_cluster.name", :allow_nil => true, :default => ""
   virtual_column :v_owning_datacenter,          :type => :string,      :uses => :all_relationships
   virtual_column :v_owning_folder,              :type => :string,      :uses => :all_relationships
-  virtual_column :total_vcpus,                  :type => :integer,     :uses => :cpu_total_cores
-  virtual_column :num_cpu,                      :type => :integer,     :uses => :hardware
-  virtual_column :cpu_total_cores,              :type => :integer,     :uses => :hardware
-  virtual_column :cpu_cores_per_socket,         :type => :integer,     :uses => :hardware
-  virtual_column :ram_size,                     :type => :integer
+  virtual_delegate :cpu_total_cores, :cpu_cores_per_socket, :to => :hardware, :allow_nil => true, :default => 0
+  virtual_delegate :num_cpu,     :to => "hardware.cpu_sockets",        :allow_nil => true, :default => 0
+  virtual_delegate :total_vcpus, :to => "hardware.cpu_total_cores",    :allow_nil => true, :default => 0
+  virtual_delegate :ram_size,    :to => "hardware.memory_mb",          :allow_nil => true, :default => 0
   virtual_column :enabled_inbound_ports,        :type => :numeric_set  # The following are not set to use anything
   virtual_column :enabled_outbound_ports,       :type => :numeric_set  # because get_ports ends up re-querying the
   virtual_column :enabled_udp_inbound_ports,    :type => :numeric_set  # database anyway.
@@ -140,7 +140,7 @@ class Host < ApplicationRecord
   virtual_column :enabled_run_level_5_services, :type => :string_set,  :uses => :host_services
   virtual_column :enabled_run_level_6_services, :type => :string_set,  :uses => :host_services
   virtual_column :last_scan_on,                 :type => :time,        :uses => :last_drift_state_timestamp
-  virtual_column :v_annotation,                 :type => :string,      :uses => :hardware
+  virtual_delegate :annotation, :to => :hardware, :prefix => "v", :allow_nil => true
   virtual_column :vmm_vendor_display,           :type => :string
   virtual_column :ipmi_enabled,                 :type => :boolean
 
@@ -191,10 +191,6 @@ class Host < ApplicationRecord
 
   def authentication_check_role
     'smartstate'
-  end
-
-  def v_annotation
-    hardware.try(:annotation)
   end
 
   def my_zone
@@ -355,7 +351,7 @@ class Host < ApplicationRecord
       data  = event.attributes["full_data"]
       prevented = data.fetch_path(:policy, :prevented) if data
     end
-    prevented ? _log.info("#{event.attributes["message"]}") : send(*action)
+    prevented ? _log.info((event.attributes["message"]).to_s) : send(*action)
   end
 
   def ipmi_power_on
@@ -713,7 +709,10 @@ class Host < ApplicationRecord
 
   # All RPs under this Host and all child RPs
   def all_resource_pools
-    descendants(:of_type => 'ResourcePool')[1..-1].sort_by { |r| r.name.downcase }
+    # descendants typically returns the default_rp first but sporadically it
+    # will not due to a bug in the ancestry gem, this means we cannot simply
+    # drop the first value and need to check is_default
+    descendants(:of_type => 'ResourcePool').select { |r| !r.is_default }.sort_by { |r| r.name.downcase }
   end
 
   def all_resource_pools_with_default
@@ -809,7 +808,7 @@ class Host < ApplicationRecord
     rescue Net::SSH::HostKeyMismatch
       raise # Re-raise the error so the UI can prompt the user to allow the keys to be reset.
     rescue Exception => err
-      _log.warn("#{err.inspect}")
+      _log.warn(err.inspect)
       raise MiqException::MiqHostError, _("Unexpected response returned from system, see log for details")
     else
       true
@@ -1330,11 +1329,6 @@ class Host < ApplicationRecord
     ram_size - current_memory_usage
   end
 
-  def ram_size
-    return 0 if hardware.nil?
-    hardware.memory_mb.to_i
-  end
-
   def firewall_rules
     return [] if operating_system.nil?
     operating_system.firewall_rules
@@ -1502,12 +1496,7 @@ class Host < ApplicationRecord
     end
   end
 
-  # Virtual columns for owning cluster, folder and datacenter
-  def v_owning_cluster
-    o = owning_cluster
-    o ? o.name : ""
-  end
-
+  # Virtual columns for folder and datacenter
   def v_owning_folder
     o = owning_folder
     o ? o.name : ""
@@ -1671,28 +1660,12 @@ class Host < ApplicationRecord
     vms.inject(0) { |t, vm| t + (vm.memory_reserve || 0) }
   end
 
-  def total_vcpus
-    cpu_total_cores || 0
-  end
-
   def vcpus_per_core
     cores = total_vcpus
     return 0 if cores == 0
 
     total_vm_vcpus = vms.inject(0) { |t, vm| t += (vm.num_cpu || 0) }
     (total_vm_vcpus / cores)
-  end
-
-  def num_cpu
-    hardware.nil? ? 0 : hardware.cpu_sockets
-  end
-
-  def cpu_total_cores
-    hardware.nil? ? 0 : hardware.cpu_total_cores
-  end
-
-  def cpu_cores_per_socket
-    hardware.nil? ? 0 : hardware.cpu_cores_per_socket
   end
 
   def domain

@@ -10,15 +10,9 @@ class ContainerNodeController < ApplicationController
     node = identify_record(params[:id], ContainerNode)
 
     if node.ipaddress
-      url = node.cockpit_url
-      render :update do |page|
-        page << javascript_prologue
-        page << "miqSparkle(false);"
-        page << "window.open('#{url}');"
-      end
+      javascript_open_window(node.cockpit_url)
     else
-      add_flash(node.unsupported_reason(:launch_cockpit))
-      javascript_flash
+      javascript_flash(:text => node.unsupported_reason(:launch_cockpit), :severity => :error, :spinner_off => true)
     end
   end
 end

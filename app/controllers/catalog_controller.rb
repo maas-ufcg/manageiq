@@ -44,23 +44,17 @@ class CatalogController < ApplicationController
   }.freeze
 
   ORCHESTRATION_TEMPLATES_NODES = {
-    'OrchestrationTemplateCfn'   => "otcfn",
-    'OrchestrationTemplateHot'   => "othot",
-    'OrchestrationTemplateAzure' => "otazu",
-    'OrchestrationTemplateVnfd'  => "otvnf"
+    'OrchestrationTemplateCfn'                                         => "otcfn",
+    'OrchestrationTemplateHot'                                         => "othot",
+    'OrchestrationTemplateAzure'                                       => "otazu",
+    'OrchestrationTemplateVnfd'                                        => "otvnf",
+    'ManageIQ::Providers::Vmware::CloudManager::OrchestrationTemplate' => "otvap"
   }.freeze
 
   def x_button
     # setting this here so it can be used in the common code
-    @sb[:action] = action = params[:pressed]
     @sb[:applies_to_class] = 'ServiceTemplate'
-
-    # guard this 'router' by matching against a list of allowed actions
-    unless CATALOG_X_BUTTON_ALLOWED_ACTIONS.key?(action)
-      raise ActionController::RoutingError, _('invalid button action')
-    end
-
-    send(CATALOG_X_BUTTON_ALLOWED_ACTIONS[action])
+    generic_x_button(CATALOG_X_BUTTON_ALLOWED_ACTIONS)
   end
 
   def servicetemplate_edit
@@ -163,7 +157,8 @@ class CatalogController < ApplicationController
       set_form_vars
       @edit[:new][:st_prov_type] = params[:st_prov_type] if params[:st_prov_type]
       @edit[:new][:service_type] = "atomic"
-      default_entry_point(@edit[:new][:st_prov_type]) if params[:st_prov_type].start_with?('generic')
+      default_entry_point(@edit[:new][:st_prov_type],
+                          @edit[:new][:service_type])
       @edit[:rec_id] = @record ? @record.id : nil
       @tabactive = @edit[:new][:current_tab_key]
     end
@@ -528,7 +523,7 @@ class CatalogController < ApplicationController
       page << "$('##{ae_tree_key}').prop('title', '#{@edit[:new][ae_tree_key]}');"
       @edit[:ae_tree_select] = false
       page << javascript_for_miq_button_visibility(@changed)
-      page << "miqDynatreeActivateNodeSilently('automate_tree', 'root');"
+      page << "miqTreeActivateNodeSilently('automate_tree', 'root');"
       page << "miqSparkle(false);"
     end
     session[:edit] = @edit
@@ -590,7 +585,7 @@ class CatalogController < ApplicationController
       st_catalog_set_record_vars(@stc)
       begin
         @stc.save
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("Error during 'Catalog Edit': %{error_message}") % {:error_message => bang.message}, :error)
       else
         if @stc.errors.empty?
@@ -645,7 +640,7 @@ class CatalogController < ApplicationController
       model_name = ui_lookup(:model => "ServiceTemplate")  # Lookup friendly model name in dictionary
       begin
         st.public_send(task.to_sym) if st.respond_to?(task)    # Run the task
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("%{model} \"%{name}\": Error during '%{task}': %{error_message}") %
           {:model => model_name, :name => st_name, :task => task, :error_message => bang.message}, :error)
       else
@@ -735,7 +730,7 @@ class CatalogController < ApplicationController
         begin
           ot.remote_proxy = true
           ot.destroy
-        rescue StandardError => bang
+        rescue => bang
           add_flash(_("Error during 'Orchestration Template Deletion': %{error_message}") %
             {:error_message => bang.message}, :error)
         else
@@ -1012,7 +1007,7 @@ class CatalogController < ApplicationController
       end
       begin
         ot.save_as_orderable!
-      rescue StandardError => bang
+      rescue => bang
         render_flash(_("Error during 'Orchestration Template Edit': %{error_message}") %
           {:error_message => bang.message}, :error)
       else
@@ -1065,7 +1060,7 @@ class CatalogController < ApplicationController
         :remote_proxy => true)
       begin
         ot.save_as_orderable!
-      rescue StandardError => bang
+      rescue => bang
         render_flash(_("Error during 'Orchestration Template Copy': %{error_message}") %
           {:error_message => bang.message}, :error)
       else
@@ -1096,7 +1091,7 @@ class CatalogController < ApplicationController
   def ot_add_submit_save
     assert_privileges("orchestration_template_add")
     load_edit("ot_add__new", "replace_cell__explorer")
-    if !%w(OrchestrationTemplateHot OrchestrationTemplateCfn OrchestrationTemplateAzure OrchestrationTemplateVnfd).include?(@edit[:new][:type])
+    if !%w(OrchestrationTemplateHot OrchestrationTemplateCfn OrchestrationTemplateAzure OrchestrationTemplateVnfd ManageIQ::Providers::Vmware::CloudManager::OrchestrationTemplate).include?(@edit[:new][:type])
       render_flash(_("\"%{type}\" is not a valid Orchestration Template type") % {:type => @edit[:new][:type]}, :error)
     elsif params[:content].nil? || params[:content].strip == ""
       render_flash(_("Error during Orchestration Template creation: new template content cannot be empty"), :error)
@@ -1111,7 +1106,7 @@ class CatalogController < ApplicationController
         :remote_proxy => true)
       begin
         ot.save_as_orderable!
-      rescue StandardError => bang
+      rescue => bang
         render_flash(_("Error during 'Orchestration Template creation': %{error_message}") %
           {:error_message => bang.message}, :error)
       else
@@ -1431,12 +1426,12 @@ class CatalogController < ApplicationController
     end
   end
 
-  def default_entry_point(prov_type)
+  def default_entry_point(prov_type, service_type)
     edit_new = @edit[:new]
     klass = class_service_template(prov_type)
-    edit_new[:fqname] = klass.default_provisioning_entry_point
-    edit_new[:retire_fqname] = klass.default_retirement_entry_point if klass.respond_to?(:default_retirement_entry_point)
-    edit_new[:reconfigure_fqname] = klass.default_reconfiguration_entry_point if klass.respond_to?(:default_reconfiguration_entry_point)
+    edit_new[:fqname] = klass.default_provisioning_entry_point(service_type)
+    edit_new[:retire_fqname] = klass.default_retirement_entry_point
+    edit_new[:reconfigure_fqname] = klass.default_reconfiguration_entry_point
   end
 
   def get_form_vars
@@ -1696,7 +1691,7 @@ class CatalogController < ApplicationController
             process_show_list(options)
           end
           @right_cell_text = _("All %{models}") % {:models => ui_lookup(:models => typ)}
-        elsif ["xx-otcfn", "xx-othot", "xx-otazu", "xx-otvnf"].include?(x_node)
+        elsif ["xx-otcfn", "xx-othot", "xx-otazu", "xx-otvnf", "xx-otvap"].include?(x_node)
           typ = node_name_to_template_name(x_node)
           @right_cell_text = _("All %{models}") % {:models => ui_lookup(:models => typ)}
           options = {:model        => typ.constantize,
@@ -1797,10 +1792,7 @@ class CatalogController < ApplicationController
         end
       end
     end
-    add_nodes = {:key      => existing_node,
-                 :children => TreeBuilder.tree_add_child_nodes(@sb,
-                                                               x_tree[:klass_name],
-                                                               existing_node)} if existing_node
+    add_nodes = {:key => existing_node, :nodes => tree_add_child_nodes(existing_node)} if existing_node
     self.x_node = if params[:rec_id]
                     "stc-#{to_cid(record.service_template_catalog_id)}_st-#{to_cid(record.id)}"
                   elsif record.kind_of?(OrchestrationTemplate)

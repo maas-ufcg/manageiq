@@ -294,8 +294,8 @@ class HostController < ApplicationController
       @in_a_form = true
       begin
         verify_host.verify_credentials(params[:type])
-      rescue StandardError => bang
-        add_flash("#{bang}", :error)
+      rescue => bang
+        add_flash(bang.to_s, :error)
       else
         add_flash(_("Credential validation was successful"))
       end
@@ -417,8 +417,8 @@ class HostController < ApplicationController
           page << "if (confirm('The Host SSH key has changed, do you want to accept the new key?')) miqAjax('#{new_url}');"
         end
         return
-      rescue StandardError => bang
-        add_flash("#{bang}", :error)
+      rescue => bang
+        add_flash(bang.to_s, :error)
       else
         add_flash(_("Credential validation was successful"))
       end
@@ -501,6 +501,9 @@ class HostController < ApplicationController
       custom_buttons if params[:pressed] == "custom_button"
       prov_redirect if params[:pressed] == "host_miq_request_new"
       toggleservicescheduling if params[:pressed] == "host_cloud_service_scheduling_toggle"
+      sethoststomanageable if params[:pressed] == "host_manageable"
+      introspecthosts if params[:pressed] == "host_introspect"
+      providehosts if params[:pressed] == "host_provide"
 
       # Handle Host power buttons
       if ["host_shutdown", "host_reboot", "host_standby", "host_enter_maint_mode", "host_exit_maint_mode",

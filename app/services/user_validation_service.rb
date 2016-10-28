@@ -28,7 +28,7 @@ class UserValidationService
     if user[:new_password].present?
       begin
         User.find_by_userid(user[:name]).change_password(user[:password], user[:new_password])
-      rescue StandardError => bang
+      rescue => bang
         return ValidateResult.new(:fail, "Error: " + bang.message)
       end
     end
@@ -83,11 +83,11 @@ class UserValidationService
                                        :action        => 'explorer',
                                        :flash_warning => true,
                                        :no_refresh    => true,
-                                       :flash_msg     => _("The CFME Server is still starting, you have been redirected to the diagnostics page for problem determination"),
+                                       :flash_msg     => _("The %{product} Server is still starting, you have been redirected to the diagnostics page for problem determination") % {:product => I18n.t('product.name')},
                                        :escape        => false)
                         )
     else
-      ValidateResult.new(:fail, _("The CFME Server is still starting. If this message persists, please contact your CFME administrator."))
+      ValidateResult.new(:fail, _("The %{product} Server is still starting. If this message persists, please contact your %{product} administrator.") % {:product => I18n.t('product.name')})
     end
   end
 

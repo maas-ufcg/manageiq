@@ -26,6 +26,8 @@ class OrchestrationTemplateDialogService
         add_azure_stack_options(dialog_group, 2)
       elsif template.kind_of?(OrchestrationTemplateVnfd)
         # TODO(lsmola) add Vnfd specific options
+      elsif template.kind_of?(ManageIQ::Providers::Vmware::CloudManager::OrchestrationTemplate)
+        add_availability_zone_field(dialog_group, 2)
       else
         add_aws_openstack_stack_options(dialog_group, 2)
       end
@@ -48,7 +50,7 @@ class OrchestrationTemplateDialogService
 
     tab.dialog_groups.build(
       :display  => "edit",
-      :label    => parameter_group.label,
+      :label    => parameter_group.label || "Parameter Group#{position}",
       :position => position
     ).tap do |dialog_group|
       parameter_group.parameters.each_with_index { |param, index| add_parameter_field(param, dialog_group, index) }
@@ -87,6 +89,23 @@ class OrchestrationTemplateDialogService
       :position       => position,
       :dialog_group   => group
     )
+  end
+
+  def add_availability_zone_field(group, position)
+    group.dialog_fields.build(
+      :type         => "DialogFieldDropDownList",
+      :name         => "availability_zone",
+      :description  => "Availability zone where the stack will be deployed",
+      :data_type    => "string",
+      :dynamic      => true,
+      :display      => "edit",
+      :required     => true,
+      :label        => "Availability zone",
+      :position     => position,
+      :dialog_group => group
+    ).tap do |dialog_field|
+      dialog_field.resource_action.fqname = "/Cloud/Orchestration/Operations/Methods/Available_Availability_Zones"
+    end
   end
 
   def add_on_failure_field(group, position)
@@ -182,9 +201,12 @@ class OrchestrationTemplateDialogService
   def add_parameter_field(parameter, group, position)
     if parameter.constraints
       dropdown = parameter.constraints.detect { |c| c.kind_of? OrchestrationTemplate::OrchestrationParameterAllowed }
+      checkbox = parameter.constraints.detect { |c| c.kind_of? OrchestrationTemplate::OrchestrationParameterBoolean } unless dropdown
     end
     if dropdown
       create_parameter_dropdown_list(parameter, group, position, dropdown)
+    elsif checkbox
+      create_parameter_checkbox(parameter, group, position)
     else
       create_parameter_textbox(parameter, group, position)
     end
@@ -223,6 +245,22 @@ class OrchestrationTemplateDialogService
       :options        => {:protected => parameter.hidden?},
       :validator_type => pattern ? 'regex' : nil,
       :validator_rule => pattern.try(:pattern),
+      :label          => parameter.label,
+      :description    => parameter.description,
+      :reconfigurable => true,
+      :position       => position,
+      :dialog_group   => group
+    )
+  end
+
+  def create_parameter_checkbox(parameter, group, position)
+    group.dialog_fields.build(
+      :type           => "DialogFieldCheckBox",
+      :name           => "param_#{parameter.name}",
+      :data_type      => "boolean",
+      :display        => "edit",
+      :default_value  => parameter.default_value,
+      :options        => {:protected => parameter.hidden?},
       :label          => parameter.label,
       :description    => parameter.description,
       :reconfigurable => true,

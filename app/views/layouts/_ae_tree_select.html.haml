@@ -1,12 +1,12 @@
 - entry_point ||= "Instance"
-.modal.fade#automate_tree_div{"tabindex"        => "-1",
-                              "role"            => "dialog",
-                              "aria-labelledby" => "ep_modal_label",
-                              "aria-describedby" => "modal",
-                              "aria-hidden"     => "true",
-                              "data-keyboard"   => "false",
-                              "data-backdrop"   => "static",
-                              :style            => "display: none"}
+.modal.fade#automate_div{"tabindex"         => "-1",
+                         "role"             => "dialog",
+                         "aria-labelledby"  => "ep_modal_label",
+                         "aria-describedby" => "modal",
+                         "aria-hidden"      => "true",
+                         "data-keyboard"    => "false",
+                         "data-backdrop"    => "static",
+                         :style             => "display: none"}
   .modal-dialog.modal-lg
     .modal-content
       .modal-header
@@ -20,18 +20,7 @@
           = _("Select Entry Point %{entry_point}") % {:entry_point => entry_point}
 
       .modal-body
-        #automate_treebox
-        = render(:partial => "layouts/dynatree",
-                 :locals => {:tree_id             => "automate_treebox",
-                             :tree_name           => "automate_tree",
-                             :json_tree           => @automate_tree,
-                             :onclick             => "miqOnClickSelectAETreeNode",
-                             :tree_root           => "#{x_node(:automate_tree)}",
-                             :base_id             => "root",
-                             :no_base_exp         => true,
-                             :exp_tree            => false,
-                             :highlighting        => true,
-                             :autoload            => true})
+        = render(:partial => 'shared/tree', :locals => {:tree => @automate_tree, :name => @automate_tree.name})
       .modal-footer
         %div{:id => "include_domain_prefix_div"}
           %input#include_domain_prefix_chk{:onchange  => "miqOnClickIncludeDomainPrefix()",

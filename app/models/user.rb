@@ -1,7 +1,6 @@
 class User < ApplicationRecord
   include RelationshipMixin
   acts_as_miq_taggable
-  include RegionMixin
   has_secure_password
   include CustomAttributeMixin
   include ActiveVmAggregationMixin
@@ -17,13 +16,16 @@ class User < ApplicationRecord
   has_many   :miq_widget_sets, :as => :owner, :dependent => :destroy
   has_many   :miq_reports, :dependent => :nullify
   has_many   :service_orders, :dependent => :nullify
+  has_many   :shares
   has_many   :notification_recipients, :dependent => :delete_all
   has_many   :notifications, :through => :notification_recipients
   has_many   :unseen_notification_recipients, -> { unseen }, :class_name => 'NotificationRecipient'
   has_many   :unseen_notifications, :through => :unseen_notification_recipients, :source => :notification
   belongs_to :current_group, :class_name => "MiqGroup"
   has_and_belongs_to_many :miq_groups
-  scope      :admin, -> { where(:userid => "admin") }
+  scope      :superadmins, lambda {
+    joins(:miq_groups => :miq_user_role).where(:miq_user_roles => {:name => MiqUserRole::SUPER_ADMIN_ROLE_NAME })
+  }
 
   virtual_has_many :active_vms, :class_name => "VmOrTemplate"
 
@@ -32,8 +34,8 @@ class User < ApplicationRecord
   delegate   :super_admin_user?, :admin_user?, :self_service?, :limited_self_service?,
              :to => :miq_user_role, :allow_nil => true
 
-  validates_presence_of   :name, :userid, :region
-  validates_uniqueness_of :userid, :scope => :region
+  validates_presence_of   :name, :userid
+  validates :userid, :uniqueness => {:conditions => -> { in_my_region } }
   validates_format_of     :email, :with => /\A([\w\.\-\+]+)@((?:[-a-z0-9]+\.)+[a-z]{2,})\z/i,
     :allow_nil => true, :message => "must be a valid email address"
   validates_inclusion_of  :current_group, :in => proc { |u| u.miq_groups }, :allow_nil => true
@@ -65,24 +67,16 @@ class User < ApplicationRecord
     {table_name => {:id => users_ids}}
   end
 
-  def self.in_region
-    where(:region => my_region_number)
-  end
-
-  def self.in_my_region
-    where(:id => region_to_range(my_region_number))
-  end
-
   def self.find_by_userid(userid)
-    in_region.find_by(:userid => userid)
+    in_my_region.find_by(:userid => userid)
   end
 
   def self.find_by_userid!(userid)
-    in_region.find_by!(:userid => userid)
+    in_my_region.find_by!(:userid => userid)
   end
 
   def self.find_by_email(email)
-    in_region.find_by(:email => email)
+    in_my_region.find_by(:email => email)
   end
 
   # find a user by lowercase email
@@ -225,34 +219,6 @@ class User < ApplicationRecord
     in_my_region.find_by_userid("admin")
   end
 
-  private
-
-  def self.seed_file_name
-    @seed_file_name ||= Rails.root.join("db", "fixtures", "#{table_name}.yml")
-  end
-
-  def self.seed_data
-    File.exist?(seed_file_name) ? YAML.load_file(seed_file_name) : []
-  end
-
-  def self.seed
-    seed_data.each do |user_attributes|
-      user_id = user_attributes[:userid]
-      next if in_my_region.find_by_userid(user_id)
-      log_attrs = user_attributes.slice(:name, :userid, :group)
-      _log.info("Creating user with parameters #{log_attrs.inspect}")
-
-      group_description = user_attributes.delete(:group)
-      group = MiqGroup.in_my_region.find_by_description(group_description)
-
-      _log.info("Creating #{user_id} user...")
-      user = create(user_attributes)
-      user.miq_groups = [group] if group
-      user.save
-      _log.info("Creating #{user_id} user... Complete")
-    end
-  end
-
   def self.current_tenant
     current_user.try(:current_tenant)
   end
@@ -286,4 +252,32 @@ class User < ApplicationRecord
   def self.with_current_user_groups
     current_user.admin_user? ? all : includes(:miq_groups).where(:miq_groups => {:id => current_user.miq_group_ids})
   end
+
+  def self.seed
+    seed_data.each do |user_attributes|
+      user_id = user_attributes[:userid]
+      next if in_my_region.find_by_userid(user_id)
+      log_attrs = user_attributes.slice(:name, :userid, :group)
+      _log.info("Creating user with parameters #{log_attrs.inspect}")
+
+      group_description = user_attributes.delete(:group)
+      group = MiqGroup.in_my_region.find_by_description(group_description)
+
+      _log.info("Creating #{user_id} user...")
+      user = create(user_attributes)
+      user.miq_groups = [group] if group
+      user.save
+      _log.info("Creating #{user_id} user... Complete")
+    end
+  end
+
+  def self.seed_file_name
+    @seed_file_name ||= Rails.root.join("db", "fixtures", "#{table_name}.yml")
+  end
+  private_class_method :seed_file_name
+
+  def self.seed_data
+    File.exist?(seed_file_name) ? YAML.load_file(seed_file_name) : []
+  end
+  private_class_method :seed_data
 end

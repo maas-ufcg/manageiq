@@ -2,8 +2,8 @@ module ManageIQ::Providers
   class Hawkular::MiddlewareManager::AlertManager
     require 'hawkular/hawkular_client'
 
-    def initialize(ems)
-      @alerts_client = ems.connect.alerts
+    def initialize(alerts_client)
+      @alerts_client = alerts_client
     end
 
     def process_alert(operation, miq_alert)
@@ -27,10 +27,16 @@ module ManageIQ::Providers
 
     def convert_to_group_trigger(miq_alert)
       eval_method = miq_alert[:conditions][:eval_method]
-      firing_match = case eval_method
-                     when "mw_heap_used", "mw_non_heap_used" then 'ANY'
-                     else 'ALL'
-                     end
+      firing_match = 'ALL'
+      # Storing prefixes for Hawkular Metrics integration
+      # These prefixes are used by alert_profile_manager.rb on member triggers creation
+      context = { 'dataId.hm.type' => 'gauge', 'dataId.hm.prefix' => 'hm_g_' }
+      case eval_method
+      when "mw_heap_used", "mw_non_heap_used"
+        firing_match = 'ANY'
+      when "mw_accumulated_gc_duration"
+        context = { 'dataId.hm.type' => 'counter', 'dataId.hm.prefix' => 'hm_c_' }
+      end
       ::Hawkular::Alerts::Trigger.new('id'          => "MiQ-#{miq_alert[:id]}",
                                       'name'        => miq_alert[:description],
                                       'description' => miq_alert[:description],
@@ -38,6 +44,7 @@ module ManageIQ::Providers
                                       'type'        => :GROUP,
                                       'eventType'   => :EVENT,
                                       'firingMatch' => firing_match,
+                                      'context'     => context,
                                       'tags'        => {
                                         'miq.event_type'    => 'hawkular_event',
                                         'miq.resource_type' => miq_alert[:based_on]
@@ -53,10 +60,14 @@ module ManageIQ::Providers
       end
     end
 
+    def mw_server_metrics_by_column
+      MiddlewareServer.live_metrics_config['middleware_server']['supported_metrics_by_column']
+    end
+
     def generate_mw_gc_condition(eval_method, options)
       c = ::Hawkular::Alerts::Trigger::Condition.new({})
       c.trigger_mode = :FIRING
-      c.data_id = MiddlewareServer.supported_metrics_by_column[eval_method]
+      c.data_id = mw_server_metrics_by_column[eval_method]
       c.type = :RATE
       c.operator = convert_operator(options[:mw_operator])
       c.threshold = options[:value_mw_garbage_collector].to_i
@@ -64,8 +75,8 @@ module ManageIQ::Providers
     end
 
     def generate_mw_jvm_conditions(eval_method, options)
-      data_id = MiddlewareServer.supported_metrics_by_column[eval_method]
-      data2_id = MiddlewareServer.supported_metrics_by_column["mw_heap_max"]
+      data_id = mw_server_metrics_by_column[eval_method]
+      data2_id = mw_server_metrics_by_column["mw_heap_max"]
       c = []
       c[0] = generate_mw_compare_condition(data_id, data2_id, :GT, options[:value_mw_greater_than].to_f / 100)
       c[1] = generate_mw_compare_condition(data_id, data2_id, :LT, options[:value_mw_less_than].to_f / 100)

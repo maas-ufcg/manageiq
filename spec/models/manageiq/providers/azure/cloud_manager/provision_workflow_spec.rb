@@ -1,5 +1,5 @@
 describe ManageIQ::Providers::Azure::CloudManager::ProvisionWorkflow do
-  include WorkflowSpecHelper
+  include Spec::Support::WorkflowHelper
 
   let(:admin)    { FactoryGirl.create(:user_with_group) }
   let(:ems)      { FactoryGirl.create(:ems_azure) }
@@ -131,7 +131,7 @@ describe ManageIQ::Providers::Azure::CloudManager::ProvisionWorkflow do
 
   context "with VPC relationships" do
     before do
-      @cn1 = FactoryGirl.create(:cloud_network, :ext_management_system => ems)
+      @cn1 = FactoryGirl.create(:cloud_network, :ext_management_system => ems.network_manager)
       @cs1 = FactoryGirl.create(:cloud_subnet, :cloud_network => @cn1)
       @cs2 = FactoryGirl.create(:cloud_subnet, :cloud_network => @cn1)
     end

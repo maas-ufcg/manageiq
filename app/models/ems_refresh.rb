@@ -1,10 +1,12 @@
 module EmsRefresh
   extend EmsRefresh::SaveInventory
+  extend EmsRefresh::SaveInventoryCinder
   extend EmsRefresh::SaveInventoryCloud
   extend EmsRefresh::SaveInventoryInfra
   extend EmsRefresh::SaveInventoryContainer
   extend EmsRefresh::SaveInventoryMiddleware
   extend EmsRefresh::SaveInventoryNetwork
+  extend EmsRefresh::SaveInventorySwift
   extend EmsRefresh::SaveInventoryHelper
   extend EmsRefresh::SaveInventoryProvisioning
   extend EmsRefresh::SaveInventoryConfiguration
@@ -55,6 +57,19 @@ module EmsRefresh
     end
   end
 
+  def self.queue_refresh_new_target(target_hash, ems)
+    MiqQueue.put(
+      :queue_name  => MiqEmsRefreshWorker.queue_name_for_ems(ems),
+      :class_name  => name,
+      :method_name => 'refresh_new_target',
+      :role        => "ems_inventory",
+      :zone        => ems.my_zone,
+      :args        => [target_hash, ems.id],
+      :msg_timeout => queue_timeout,
+      :task_id     => nil
+    )
+  end
+
   def self.refresh(target, id = nil)
     EmsRefresh.init_console if defined?(Rails::Console)
 
@@ -75,6 +90,18 @@ module EmsRefresh
     groups.each do |refresher, group_targets|
       refresher.refresh(group_targets) if refresher
     end
+  end
+
+  def self.refresh_new_target(target_hash, ems_id)
+    ems = ExtManagementSystem.find(ems_id)
+
+    target = save_new_target(target_hash)
+    if target.nil?
+      _log.warn "Unknown target for event data: #{target_hash}."
+      return
+    end
+
+    ems.refresher.refresh(get_ar_objects(target))
   end
 
   def self.get_ar_objects(target, single_id = nil)
@@ -170,76 +197,5 @@ module EmsRefresh
     end
 
     ret.join(", ")
-  end
-
-  #
-  # Inventory saving for Reconfigure VM Task event
-  #
-
-  def self.reconfig_refresh(vm)
-    ManageIQ::Providers::Vmware::InfraManager::Refresher.reconfig_refresh(vm)
-  end
-
-  def self.reconfig_save_vm_inventory(vm, hashes)
-    return if hashes.nil?
-    log_header = "Vm: [#{vm.name}], id: [#{vm.id}]"
-
-    reconfig_find_lans_inventory(vm.host, hashes[:uid_lookup][:lans].values)
-    reconfig_find_storages_inventory(hashes[:uid_lookup][:storages].values)
-    hash = hashes[:vms].first
-
-    child_keys = [:operating_system, :hardware]
-    remove_keys = child_keys
-
-    begin
-      raise MiqException::MiqIncompleteData if hash[:invalid]
-
-      _log.info("#{log_header} Updating Vm [#{vm.name}] id: [#{vm.id}] location: [#{vm.location}] storage id: [#{vm.storage_id}] uid_ems: [#{vm.uid_ems}]")
-      vm.update_attributes!(hash.except(*remove_keys))
-      save_child_inventory(vm, hash, child_keys)
-      vm.save!
-      hash[:id] = vm.id
-    rescue => err
-      # If a vm failed to process, mark it as invalid and log an error
-      hash[:invalid] = true
-      name = hash[:name] || hash[:uid_ems] || hash[:ems_ref]
-      if err.kind_of?(MiqException::MiqIncompleteData)
-        _log.warn("#{log_header} Processing Vm: [#{name}] failed with error [#{err}]. Skipping Vm.")
-      else
-        raise if EmsRefresh.debug_failures
-        _log.error("#{log_header} Processing Vm: [#{name}] failed with error [#{err}]. Skipping Vm.")
-        _log.log_backtrace(err)
-      end
-    end
-  end
-
-  def self.reconfig_find_lans_inventory(host, hashes)
-    return if hashes.nil?
-    lans = host.lans
-    hashes.each do |h|
-      found = lans.detect { |l| l.uid_ems == h[:uid_ems] }
-      h[:id] = found.id if found
-    end
-  end
-
-  def self.reconfig_find_storages_inventory(hashes)
-    return if hashes.nil?
-
-    # Query for all of the storages ahead of time
-    locs, names = hashes.partition { |h| h[:location] }
-    locs.collect!  { |h| h[:location] }
-    names.collect! { |h| h[:name] }
-    locs  = Storage.where(:location => locs) unless locs.empty?
-    names = Storage.where(:location => nil, :name => names) unless names.empty?
-
-    hashes.each do |h|
-      found = if h[:location]
-                locs.detect { |s| s.location == h[:location] }
-              else
-                names.detect { |s| s.name == h[:name] }
-              end
-
-      h[:id] = found.id if found
-    end
   end
 end

@@ -5,14 +5,9 @@ module Api
     include Subcollections::Results
     include Subcollections::Schedules
 
-    def show
-      if @req.subcollection == "results" && (@req.s_id || @req.expand?(:resources)) && attribute_selection == "all"
-        @additional_attributes = %w(result_set)
-      end
-      super
-    end
+    before_action :set_additional_attributes, :only => [:show]
 
-    def run_resource_reports(_type, id, _data)
+    def run_resource(_type, id, _data)
       report = MiqReport.find(id)
       report_result = MiqReportResult.find(report.queue_generate_table)
       run_report_result(true,
@@ -32,13 +27,13 @@ module Api
       res
     end
 
-    def import_resource_reports(_type, _id, data)
+    def import_resource(_type, _id, data)
       options = data.fetch("options", {}).symbolize_keys.merge(:user => @auth_user_obj)
       result, meta = MiqReport.import_from_hash(data["report"], options)
       action_result(meta[:level] == :info, meta[:message], :result => result)
     end
 
-    def schedule_resource_reports(type, id, data)
+    def schedule_resource(type, id, data)
       api_action(type, id) do |klass|
         report = resource_search(id, type, klass)
         schedule_reports(report, type, id, data)
@@ -46,6 +41,12 @@ module Api
     end
 
     private
+
+    def set_additional_attributes
+      if @req.subcollection == "results" && (@req.s_id || @req.expand?(:resources)) && attribute_selection == "all"
+        @additional_attributes = %w(result_set)
+      end
+    end
 
     def schedule_reports(report, type, id, data)
       desc = "scheduling of report #{report.id}"

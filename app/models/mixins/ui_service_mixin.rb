@@ -13,13 +13,27 @@ module UiServiceMixin
       :MiddlewareDeployment    => {:type => "glyph", :icon => "\uE603", :fontfamily => "icomoon"},                 # product-report
       :MiddlewareDeploymentEar => {:type => "glyph", :icon => "\uE626", :fontfamily => "icomoon"},                 # product-file-ear-o
       :MiddlewareDeploymentWar => {:type => "glyph", :icon => "\uE627", :fontfamily => "icomoon"},                 # product-file-war-o
-      :MiddlewareDomain        => {:type => "glyph", :icon => "\uF0E8", :fontfamily => "FontAwesome"},             # fa-sitemap
-      :MiddlewareServerGroup   => {:type => "glyph", :icon => "\uF00A", :fontfamily => "FontAwesome"},             # fa-th
+      :MiddlewareDomain        => {:type => "glyph", :icon => "\uE639", :fontfamily => "icomoon"},
+      :MiddlewareMessaging     => {:type => "glyph", :icon => "\uF0EC", :fontfamily => "FontAwesome"},             # fa-exchange (placeholder)
+      :MiddlewareServerGroup   => {:type => "glyph", :icon => "\uE638", :fontfamily => "icomoon"},
       :Kubernetes              => {:type => "image", :icon => provider_icon(:Kubernetes)},
       :Openshift               => {:type => "image", :icon => provider_icon(:Openshift)},
       :OpenshiftEnterprise     => {:type => "image", :icon => provider_icon(:OpenshiftEnterprise)},
-      :Atomic                  => {:type => "image", :icon => provider_icon(:Atomic)},
-      :AtomicEnterprise        => {:type => "image", :icon => provider_icon(:AtomicEnterprise)},
+      :CloudSubnet             => {:type => "glyph", :icon => "\uE909", :fontfamily => "PatternFlyIcons-webfont"}, # pficon-network
+      :NetworkRouter           => {:type => "glyph", :icon => "\uE625", :fontfamily => "PatternFlyIcons-webfont"}, # pficon-route
+      :SecurityGroup           => {:type => "glyph", :icon => "\uE903", :fontfamily => "PatternFlyIcons-webfont"}, # pficon-cloud-security
+      :FloatingIp              => {:type => "glyph", :icon => "\uF041", :fontfamily => "FontAwesome"},             # fa-map-marker
+      :CloudNetwork            => {:type => "glyph", :icon => "\uE62c", :fontfamily => "IcoMoon"},
+      :CloudTenant             => {:type => "glyph", :icon => "\uE904", :fontfamily => "PatternFlyIcons-webfont"}, # pficon-cloud-tenant
+      :LoadBalancer            => {:type => "glyph", :icon => "\uE608", :fontfamily => "PatternFlyIcons-webfont"}, # pficon-load-balancer
+      :Tag                     => {:type => "glyph", :icon => "\uF02b", :fontfamily => "FontAwesome"},
+      :Openstack               => {:type => "image", :icon => provider_icon(:Openstack)},
+      :Amazon                  => {:type => "image", :icon => provider_icon(:Amazon)},
+      :Azure                   => {:type => "image", :icon => provider_icon(:Azure)},
+      :Google                  => {:type => "image", :icon => provider_icon(:Google)},
+      :Microsoft               => {:type => "image", :icon => provider_icon(:Microsoft)},
+      :Redhat                  => {:type => "image", :icon => provider_icon(:Redhat)},
+      :Vmware                  => {:type => "image", :icon => provider_icon(:Vmware)},
     }
   end
 

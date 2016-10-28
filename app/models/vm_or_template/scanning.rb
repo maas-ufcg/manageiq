@@ -8,13 +8,6 @@ require 'blackbox/VmBlackBox'
 module VmOrTemplate::Scanning
   extend ActiveSupport::Concern
 
-  # Smartstate Analysis is unsupported by default.
-  # Subclasses need to override this method if they support SSA.
-  included do
-    supports_not :smartstate_analysis,
-                 :reason => _("Smartstate Analysis is not available for this type of VM or Template.")
-  end
-
   # Call the VmScan Job and raise a "request" event
   def scan(userid = "system", options = {})
     # Check if there are any current scan jobs already waiting to run
@@ -34,8 +27,6 @@ module VmOrTemplate::Scanning
       :sync_key     => guid,
     }.merge(options)
     options[:zone] = ext_management_system.my_zone unless ext_management_system.nil?
-    # options = {:agent_id => myhost.id, :agent_class => myhost.class.to_s}.merge!(options) unless myhost.nil?
-    # self.vm_state.power_state == "on" ? options[:force_snapshot] = true : options[:force_snapshot] = false
 
     _log.info "NAME [#{options[:name]}] SCAN [#{options[:categories].inspect}] [#{options[:categories].class}]"
 

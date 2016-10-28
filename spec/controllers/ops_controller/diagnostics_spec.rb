@@ -10,7 +10,7 @@ shared_examples "logs_collect" do |type|
       :active_tab       => "diagnostics_roles_servers"
     }
     controller.instance_variable_set(:@sb, sb_hash)
-    allow(MiqServer).to receive(:my_server).with(true).and_return(server)
+    allow(MiqServer).to receive(:my_server).and_return(server)
   end
 
   it "not running" do
@@ -141,7 +141,7 @@ describe OpsController do
       post :restart_server
 
       expect(response.body).to include("flash_msg_div")
-      expect(response.body).to include("CFME Appliance restart initiated successfully")
+      expect(response.body).to include("%{product} Appliance restart initiated successfully" % {:product => I18n.t('product.name')})
     end
 
     it "#delete_server returns successful message" do

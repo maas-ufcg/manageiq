@@ -4,9 +4,10 @@ module ManageIQ::Providers::Vmware::InfraManager::Provision::StateMachine
   end
 
   def determine_placement
-    host, datastore = placement
+    host, cluster, datastore = placement
 
-    options[:dest_host]    = [host.id, host.name]
+    options[:dest_host]    = [host.id, host.name]       if host
+    options[:dest_cluster] = [cluster.id, cluster.name] if cluster
     options[:dest_storage] = [datastore.id, datastore.name]
     signal :start_clone_task
   end
@@ -28,7 +29,7 @@ module ManageIQ::Providers::Vmware::InfraManager::Provision::StateMachine
 
     status_message = "completed; post provision work queued" if clone_status
     message = "Clone of #{clone_direction} is #{status_message}"
-    _log.info("#{message}")
+    _log.info(message.to_s)
     update_and_notify_parent(:message => message)
 
     if clone_status

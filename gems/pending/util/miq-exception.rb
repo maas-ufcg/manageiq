@@ -103,10 +103,31 @@ module MiqException
   class MiqOrchestrationDeleteError < Error; end
   class MiqOrchestrationStackNotExistError < Error; end
 
+  class MiqLoadBalancerProvisionError < Error; end
+  class MiqLoadBalancerStatusError < Error; end
+  class MiqLoadBalancerValidationError < Error; end
+  class MiqLoadBalancerUpdateError < Error; end
+  class MiqLoadBalancerDeleteError < Error; end
+  class MiqLoadBalancerNotExistError < Error; end
+
+  class MiqNetworkValidationError < Error; end
+  class MiqNetworkCreateError < Error; end
+  class MiqNetworkUpdateError < Error; end
+  class MiqNetworkDeleteError < Error; end
+
   class MiqVolumeValidationError < Error; end
   class MiqVolumeCreateError < Error; end
   class MiqVolumeUpdateError < Error; end
   class MiqVolumeDeleteError < Error; end
+
+  class MiqSubnetValidationError < Error; end
+  class MiqSubnetCreateError < Error; end
+  class MiqSubnetUpdateError < Error; end
+  class MiqSubnetDeleteError < Error; end
+
+  class MiqCloudTenantCreateError < Error; end
+  class MiqCloudTenantUpdateError < Error; end
+  class MiqCloudTenantDeleteError < Error; end
 
   class MiqOpenstackRequiredServiceMissing < Error; end
   class MiqOpenstackKeystoneServiceMissing < MiqOpenstackRequiredServiceMissing; end
@@ -115,6 +136,7 @@ module MiqException
   class MiqOpenstackGlanceServiceMissing < MiqOpenstackRequiredServiceMissing; end
   class MiqOpenstackIronicServiceMissing < MiqOpenstackRequiredServiceMissing; end
   class MiqOpenstackIntrospectionServiceMissing < MiqOpenstackRequiredServiceMissing; end
+  class MiqOpenstackWorkflowServiceMissing < MiqOpenstackRequiredServiceMissing; end
 
   class MiqOpenstackApiRequestError < Error; end
 end

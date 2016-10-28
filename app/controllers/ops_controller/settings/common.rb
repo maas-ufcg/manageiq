@@ -140,15 +140,9 @@ module OpsController::Settings::Common
           end
         end
       when 'settings_workers'
-        if @edit[:default_verify_status] != session[:log_depot_default_verify_status]
-          session[:log_depot_default_verify_status] = @edit[:default_verify_status]
-          verb = @edit[:default_verify_status] ? 'show' : 'hide'
-          page << "miqValidateButtons('#{verb}', 'default_');"
-        end
         if @edit[:new].config[:workers][:worker_base][:ui_worker][:count] != @edit[:current].config[:workers][:worker_base][:ui_worker][:count]
           page.replace("flash_msg_div", :partial => "layouts/flash_msg")
         end
-        page.replace_html('pwd_note', @edit[:default_verify_status] ? '' : _("* Passwords don't match."))
       end
 
       page << javascript_for_miq_button_visibility(@changed || @login_text_changed)
@@ -210,19 +204,14 @@ module OpsController::Settings::Common
     else
       begin
         MiqRegion.replication_type = replication_type
-      rescue StandardError => bang
-        add_flash(_("Error during replication configuration save: ") %
+      rescue => bang
+        add_flash(_("Error during replication configuration save: %{message}") %
                     {:message => bang.message}, :error)
       else
         add_flash(_("Replication configuration save was successful"))
       end
     end
-
-    render :update do |page|
-      page << javascript_prologue
-      page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-      page << "miqSparkle(false);"
-    end
+    javascript_flash(:spinner_off => true)
   end
 
   def pglogical_validate_subscription
@@ -442,7 +431,7 @@ module OpsController::Settings::Common
             begin
               server.name = @update.config[:server][:name]
               server.save!
-            rescue StandardError => bang
+            rescue => bang
               add_flash(_("Error when saving new server name: %{message}") % {:message => bang.message}, :error)
               javascript_flash
               return
@@ -453,11 +442,11 @@ module OpsController::Settings::Common
         end
         AuditEvent.success(build_config_audit(@edit[:new], @edit[:current].config))
         if @sb[:active_tab] == "settings_server"
-          add_flash(_("Configuration settings saved for CFME Server \"%{name} [%{server_id}]\" in Zone \"%{zone}\"") %
-                      {:name => server.name, :server_id => server.id, :zone => server.my_zone})
+          add_flash(_("Configuration settings saved for %{product} Server \"%{name} [%{server_id}]\" in Zone \"%{zone}\"") %
+                      {:name => server.name, :server_id => server.id, :zone => server.my_zone, :product => I18n.t('product.name')})
         elsif @sb[:active_tab] == "settings_authentication"
-          add_flash(_("Authentication settings saved for CFME Server \"%{name} [%{server_id}]\" in Zone \"%{zone}\"") %
-                      {:name => server.name, :server_id => server.id, :zone => server.my_zone})
+          add_flash(_("Authentication settings saved for %{product} Server \"%{name} [%{server_id}]\" in Zone \"%{zone}\"") %
+                      {:name => server.name, :server_id => server.id, :zone => server.my_zone, :product => I18n.t('product.name')})
         else
           add_flash(_("Configuration settings saved"))
         end
@@ -488,9 +477,6 @@ module OpsController::Settings::Common
       end
     elsif @sb[:active_tab] == "settings_workers" &&
           x_node.split("-").first != "z"
-      unless @edit[:default_verify_status]
-        add_flash(_("Password/Verify Password do not match"), :error)
-      end
       unless @flash_array.nil?
         session[:changed] = @changed = true
         javascript_flash
@@ -504,8 +490,8 @@ module OpsController::Settings::Common
         server.set_config(@update)
 
         AuditEvent.success(build_config_audit(@edit[:new].config, @edit[:current].config))
-        add_flash(_("Configuration settings saved for CFME Server \"%{name} [%{server_id}]\" in Zone \"%{zone}\"") %
-                    {:name => server.name, :server_id => @sb[:selected_server_id], :zone => server.my_zone})
+        add_flash(_("Configuration settings saved for %{product} Server \"%{name} [%{server_id}]\" in Zone \"%{zone}\"") %
+                    {:name => server.name, :server_id => @sb[:selected_server_id], :zone => server.my_zone, :product => I18n.t('product.name')})
 
         if @sb[:active_tab] == "settings_workers" && @sb[:selected_server_id] == MiqServer.my_server.id  # Reset session variables for names fields, if editing current server config
           session[:customer_name] = @update.config[:server][:company]
@@ -626,7 +612,6 @@ module OpsController::Settings::Common
                                                                     true,
                                                                     @selected_zone)
     end
-
     @edit[:new] = copy_hash(@edit[:current])
     session[:edit] = @edit
     @in_a_form = true
@@ -641,7 +626,7 @@ module OpsController::Settings::Common
         server.vm_scan_storage_affinity = Storage.where(:id => children[:storages].to_a).to_a
       end
     end
-  rescue StandardError => bang
+  rescue => bang
     add_flash(_("Error during Analysis Affinity save: %{message}") % {:message => bang.message}, :error)
   else
     add_flash(_("Analysis Affinity was saved"))

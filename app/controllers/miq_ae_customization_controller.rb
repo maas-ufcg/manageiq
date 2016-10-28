@@ -68,7 +68,9 @@ class MiqAeCustomizationController < ApplicationController
   def import_service_dialogs
     if params[:commit] == _('Commit')
       if params[:dialogs_to_import].blank?
-        render_flash_and_stop_sparkle(_("At least one Service Dialog must be selected."), :error)
+        javascript_flash(:spinner_off => true,
+                         :text => _("At least one Service Dialog must be selected."),
+                         :severity => :error)
         return
       end
 
@@ -152,7 +154,7 @@ class MiqAeCustomizationController < ApplicationController
       render :update do |page|
         page << javascript_prologue
         page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-        page << "miqDynatreeActivateNodeSilently('#{x_active_tree}', '#{x_node}');"
+        page << "miqTreeActivateNodeSilently('#{x_active_tree}', '#{x_node}');"
         page << "miqSparkle(false);"
       end
     end

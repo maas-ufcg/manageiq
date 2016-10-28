@@ -3,11 +3,11 @@
     - unless @version_messages.blank?
       - @version_messages.each do |msg|
         = render :partial => 'layouts/info_msg', :locals => {:message => msg}
-    = render :partial => "layouts/flash_msg", :locals => {:div_num => "_ns_list"}
+    = render :partial => "layouts/flash_msg"
     %table#ns_list_grid.table.table-striped.table-bordered.table-hover.table-clickable.table-checkable
       %thead
         %th.narrow
-          %input{:type => 'checkbox', :title => _('Check All')}
+          %input.checkall{:type => 'checkbox', :title => _('Check All')}
         %th
         %th= _('Name')
         %th= _('Description')
@@ -22,6 +22,10 @@
             %td.narrow
               - if record.git_enabled?
                 %img{:src => image_path('100/ae_git_domain.png')}
+              - elsif record.name == MiqAeDatastore::MANAGEIQ_DOMAIN
+                %img{:src => image_path('100/miq.png')}
+              - elsif record.top_level_namespace  
+                %img{:src => image_path("100/vendor-#{record.top_level_namespace.downcase}.png")}
               - else
                 %i.fa.fa-2x.fa-globe
             %td
@@ -37,7 +41,7 @@
 
   - else
     - url = url_for(:action => 'form_ns_field_changed', :id => "#{@ae_ns.id || 'new'}")
-    = render :partial => "layouts/flash_msg", :locals => {:div_num => "_ns_list"}
+    = render :partial => "layouts/flash_msg"
     #form_ns_div
       %h3
         = _('Info')

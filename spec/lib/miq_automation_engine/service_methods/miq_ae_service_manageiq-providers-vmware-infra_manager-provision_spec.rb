@@ -1,8 +1,7 @@
 module MiqAeServiceManageIQ_Providers_Vmware_InfraManager_ProvisionSpec
   describe MiqAeMethodService::MiqAeServiceManageIQ_Providers_Vmware_InfraManager_Provision do
     before(:each) do
-      MiqAutomateHelper.create_service_model_method('SPEC_DOMAIN', 'EVM',
-                                                    'AUTOMATE', 'test1', 'test')
+      Spec::Support::MiqAutomateHelper.create_service_model_method('SPEC_DOMAIN', 'EVM', 'AUTOMATE', 'test1', 'test')
       @ae_method     = ::MiqAeMethod.first
       @ae_result_key = 'foo'
 
@@ -308,6 +307,34 @@ module MiqAeServiceManageIQ_Providers_Vmware_InfraManager_ProvisionSpec
         invoke_ae.root(@ae_result_key)
         expect(@miq_provision.reload.options[:sysprep_custom_spec]).to eq([@cs.id, @cs.name])
         expect(@miq_provision.reload.options[:sysprep_enabled]).to eq(%w(fields Specification))
+      end
+    end
+
+    context "storage_profiles" do
+      let(:storage_profile) { FactoryGirl.create(:storage_profile, :name => "Test StorageProfile", :ems_id => @ems.id) }
+
+      before(:each) do
+        @vm_template.storage_profile = storage_profile
+      end
+
+      it "#eligible_storage_profiles" do
+        method = "$evm.root['#{@ae_result_key}'] = $evm.root['miq_provision'].eligible_storage_profiles"
+        @ae_method.update_attributes(:data => method)
+        result = invoke_ae.root(@ae_result_key)
+        expect(result).to be_kind_of(Array)
+        expect(result.first.class).to eq(MiqAeMethodService::MiqAeServiceStorageProfile)
+      end
+
+      it "#set_storage_profiles" do
+        method = <<-AUTOMATE_SCRIPT
+          prov = $evm.root['miq_provision']
+          prov.eligible_storage_profiles.each {|sp| prov.set_storage_profile(sp)}
+        AUTOMATE_SCRIPT
+        @ae_method.update_attributes(:data => method)
+        invoke_ae.root(@ae_result_key)
+        expect(@miq_provision.reload.options[:placement_storage_profile]).to eq(
+          [storage_profile.id, storage_profile.name]
+        )
       end
     end
 

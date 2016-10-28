@@ -194,7 +194,7 @@ module VmHelper::TextualSummary
     return nil if @record.kind_of?(ManageIQ::Providers::Openstack::CloudManager::Template)
     {:label => _("Retirement Date"),
      :image => "retirement",
-     :value => (@record.retires_on.nil? ? _("Never") : @record.retires_on.to_time.strftime("%x"))}
+     :value => (@record.retires_on.nil? ? _("Never") : @record.retires_on.strftime("%x %R %Z"))}
   end
 
   def textual_retirement_state
@@ -216,7 +216,7 @@ module VmHelper::TextualSummary
   end
 
   def textual_cluster
-    cluster = @record.host.try(:ems_cluster)
+    cluster = @record.try(:ems_cluster)
     return nil if cluster.nil?
     h = {:label => title_for_cluster, :image => "ems_cluster", :value => (cluster.nil? ? _("None") : cluster.name)}
     if cluster && role_allows?(:feature => "ems_cluster_show")

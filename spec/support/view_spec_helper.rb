@@ -1,5 +1,3 @@
-require 'hamlit-rails'
-
 module ViewSpecHelper
   def show_element(resp, id)
     set_element_visibility(resp, id, true)

@@ -171,43 +171,17 @@ module ManageIQ::Providers
       run_generic_operation(:Shutdown, ems_ref)
     end
 
-    def stop_middleware_deployment(ems_ref, _name)
-      run_generic_operation(:Undeploy, ems_ref)
-    end
-
-    def start_middleware_deployment(ems_ref, _name)
-      run_generic_operation(:Deploy, ems_ref)
-    end
-
-    def undeploy_middleware_deployment(ems_ref, name)
-      with_provider_connection do |connection|
-        deployment_data = {
-          :resource_path   => ems_ref.to_s,
-          :deployment_name => name
-        }
-
-        connection.operations(true).remove_deployment(deployment_data) do |on|
-          on.success do |data|
-            _log.debug "Success on websocket-operation #{data}"
-          end
-          on.failure do |error|
-            _log.error 'error callback was called, reason: ' + error.to_s
-          end
-        end
-      end
-    end
-
     def restart_middleware_server(ems_ref)
       run_generic_operation(:Shutdown, ems_ref, :restart => true)
     end
 
-    def shutdown_middleware_server(ems_ref, _params)
-      timeout = 10 # we default to 10s until we get the UI params. params.fetch ':timeout'
+    def shutdown_middleware_server(ems_ref, params)
+      timeout = params[:timeout] || 0
       run_generic_operation(:Shutdown, ems_ref, :restart => false, :timeout => timeout)
     end
 
     def suspend_middleware_server(ems_ref, params)
-      timeout = params[':timeout'] || 0
+      timeout = params[:timeout] || 0
       run_generic_operation(:Suspend, ems_ref, :timeout => timeout)
     end
 
@@ -229,28 +203,144 @@ module ManageIQ::Providers
       ::Hawkular::Alerts::AlertsClient.new(url, credentials)
     end
 
-    def redeploy_middleware_deployment(ems_ref, _name)
-      run_generic_operation(:Redeploy, ems_ref)
+    def add_middleware_datasource(ems_ref, hash)
+      with_provider_connection do |connection|
+        datasource_data = {
+          :resourcePath   => ems_ref.to_s,
+          :datasourceName => hash[:datasource]["datasourceName"],
+          :xaDatasource   => hash[:datasource]["xaDatasource"],
+          :jndiName       => hash[:datasource]["jndiName"],
+          :driverName     => hash[:datasource]["driverName"],
+          :driverClass    => hash[:datasource]["driverClass"],
+          :connectionUrl  => hash[:datasource]["connectionUrl"],
+          :userName       => hash[:datasource]["userName"],
+          :password       => hash[:datasource]["password"],
+          :securityDomain => hash[:datasource]["securityDomain"]
+        }
+
+        connection.operations(true).add_datasource(datasource_data) do |on|
+          on.success do |data|
+            _log.debug "Success on websocket-operation #{data}"
+          end
+          on.failure do |error|
+            _log.error 'error callback was called, reason: ' + error.to_s
+          end
+        end
+      end
     end
 
     def add_middleware_deployment(ems_ref, hash)
       with_provider_connection do |connection|
         deployment_data = {
           :enabled               => hash[:file]["enabled"],
+          :force_deploy          => hash[:file]["force_deploy"],
           :destination_file_name => hash[:file]["runtime_name"] || hash[:file]["file"].original_filename,
           :binary_content        => hash[:file]["file"].read,
           :resource_path         => ems_ref.to_s
         }
 
-        actual_data = {}
         connection.operations(true).add_deployment(deployment_data) do |on|
           on.success do |data|
             _log.debug "Success on websocket-operation #{data}"
-            actual_data[:data] = data
           end
           on.failure do |error|
-            actual_data[:data] = {}
-            actual_data[:error] = error
+            _log.error 'error callback was called, reason: ' + error.to_s
+          end
+        end
+      end
+    end
+
+    def undeploy_middleware_deployment(ems_ref, deployment_name)
+      with_provider_connection do |connection|
+        deployment_data = {
+          :resource_path   => ems_ref.to_s,
+          :deployment_name => deployment_name,
+          :remove_content  => true
+        }
+
+        connection.operations(true).undeploy(deployment_data) do |on|
+          on.success do |data|
+            _log.debug "Success on websocket-operation #{data}"
+          end
+          on.failure do |error|
+            _log.error 'error callback was called, reason: ' + error.to_s
+          end
+        end
+      end
+    end
+
+    def disable_middleware_deployment(ems_ref, deployment_name)
+      with_provider_connection do |connection|
+        deployment_data = {
+          :resource_path   => ems_ref.to_s,
+          :deployment_name => deployment_name
+        }
+
+        connection.operations(true).disable_deployment(deployment_data) do |on|
+          on.success do |data|
+            _log.debug "Success on websocket-operation #{data}"
+          end
+          on.failure do |error|
+            _log.error 'error callback was called, reason: ' + error.to_s
+          end
+        end
+      end
+    end
+
+    def enable_middleware_deployment(ems_ref, deployment_name)
+      with_provider_connection do |connection|
+        deployment_data = {
+          :resource_path   => ems_ref.to_s,
+          :deployment_name => deployment_name
+        }
+
+        connection.operations(true).enable_deployment(deployment_data) do |on|
+          on.success do |data|
+            _log.debug "Success on websocket-operation #{data}"
+          end
+          on.failure do |error|
+            _log.error 'error callback was called, reason: ' + error.to_s
+          end
+        end
+      end
+    end
+
+    def restart_middleware_deployment(ems_ref, deployment_name)
+      with_provider_connection do |connection|
+        deployment_data = {
+          :resource_path   => ems_ref.to_s,
+          :deployment_name => deployment_name
+        }
+
+        connection.operations(true).restart_deployment(deployment_data) do |on|
+          on.success do |data|
+            _log.debug "Success on websocket-operation #{data}"
+          end
+          on.failure do |error|
+            _log.error 'error callback was called, reason: ' + error.to_s
+          end
+        end
+      end
+    end
+
+    def add_middleware_jdbc_driver(ems_ref, hash)
+      with_provider_connection do |connection|
+        driver_data = {
+          :driver_name          => hash[:driver]["driver_name"],
+          :driver_jar_name      => hash[:driver]["driver_jar_name"] || hash[:driver]["file"].original_filename,
+          :module_name          => hash[:driver]["module_name"],
+          :driver_class         => hash[:driver]["driver_class"],
+          :driver_major_version => hash[:driver]["driver_major_version"],
+          :driver_minor_version => hash[:driver]["driver_minor_version"],
+          :binary_content       => hash[:driver]["file"].read,
+          :resource_path        => ems_ref.to_s
+        }
+
+        connection.operations(true).add_jdbc_driver(driver_data) do |on|
+          on.success do |data|
+            _log.debug "Success on websocket-operation #{data}"
+          end
+          on.failure do |error|
             _log.error 'error callback was called, reason: ' + error.to_s
           end
         end
@@ -316,11 +406,11 @@ module ManageIQ::Providers
     end
 
     def alert_manager
-      @alert_manager ||= ManageIQ::Providers::Hawkular::MiddlewareManager::AlertManager.new(self)
+      @alert_manager ||= ManageIQ::Providers::Hawkular::MiddlewareManager::AlertManager.new(alerts_client)
     end
 
     def alert_profile_manager
-      @alert_profile_manager ||= ManageIQ::Providers::Hawkular::MiddlewareManager::AlertProfileManager.new(self)
+      @alert_profile_manager ||= ManageIQ::Providers::Hawkular::MiddlewareManager::AlertProfileManager.new(alerts_client)
     end
 
     private

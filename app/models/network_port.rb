@@ -2,9 +2,7 @@ class NetworkPort < ApplicationRecord
   include NewWithTypeStiMixin
   acts_as_miq_taggable
 
-  # TODO(lsmola) NetworkManager, once all providers use network manager rename this to
-  # "ManageIQ::Providers::NetworkManager"
-  belongs_to :ext_management_system, :foreign_key => :ems_id, :class_name => "ManageIQ::Providers::BaseManager"
+  belongs_to :ext_management_system, :foreign_key => :ems_id, :class_name => "ManageIQ::Providers::NetworkManager"
   belongs_to :cloud_tenant
   belongs_to :device, :polymorphic => true
 
@@ -53,11 +51,11 @@ class NetworkPort < ApplicationRecord
   # Define all getters and setters for extra_attributes related virtual columns
   %i(binding_virtual_interface_details binding_virtual_nic_type binding_profile extra_dhcp_opts
      allowed_address_pairs fixed_ips).each do |action|
-	  define_method("#{action.to_s}=") do |value|
+	  define_method("#{action}=") do |value|
       extra_attributes_save(action, value)
     end
 
-    define_method("#{action.to_s}") do
+    define_method(action) do
       extra_attributes_load(action)
     end
   end

@@ -83,6 +83,11 @@ class MiqReport < ApplicationRecord
     q
   end
 
+  # NOTE: this can by dynamically manipulated
+  def cols
+    self[:cols] ||= (self[:col_order] || []).reject { |x| x.include?(".") }
+  end
+
   def view_filter_columns
     col_order.collect { |c| [headers[col_order.index(c)], c] }
   end
@@ -145,7 +150,7 @@ class MiqReport < ApplicationRecord
   end
 
   def list_schedules
-    exp = MiqExpression.new("=" => {"field" => "MiqReport.id",
+    exp = MiqExpression.new("=" => {"field" => "MiqReport-id",
                                     "value" => id})
     MiqSchedule.filter_matches_with exp
   end
@@ -155,7 +160,7 @@ class MiqReport < ApplicationRecord
     params['name'] ||= name
     params['description'] ||= title
 
-    params['filter'] = MiqExpression.new("=" => {"field" => "MiqReport.id",
+    params['filter'] = MiqExpression.new("=" => {"field" => "MiqReport-id",
                                                  "value" => id})
     params['towhat'] = "MiqReport"
     params['prod_default'] = "system"

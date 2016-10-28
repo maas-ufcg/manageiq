@@ -29,9 +29,12 @@
 - ems-type:openstack
 - ems-type:openstack_infra
 - ems-type:openstack_network
+- ems-type:physical_infra_manager
 - ems-type:rhevm
 - ems-type:scvmm
 - ems-type:vmwarews
 - ems-type:vmware_cloud
 - ems-type:vmware_cloud_network
 - ems-type:nuage_network
+- ems-type:cinder
+- ems-type:swift

@@ -31,6 +31,7 @@ class Tenant < ApplicationRecord
   has_many :miq_requests, :dependent => :destroy
   has_many :miq_request_tasks, :dependent => :destroy
   has_many :services, :dependent => :destroy
+  has_many :shares
 
   belongs_to :default_miq_group, :class_name => "MiqGroup", :dependent => :destroy
   belongs_to :source, :polymorphic => true
@@ -247,7 +248,7 @@ class Tenant < ApplicationRecord
   def reset_domain_priority_by_ordered_ids(ids)
     uneditable_domains = visible_domains - editable_domains
     uneditable_domains.delete_if { |domain| domain.name == MiqAeDatastore::MANAGEIQ_DOMAIN }
-    MiqAeDomain.reset_priority_by_ordered_ids(uneditable_domains.collect(&:id) + ids)
+    MiqAeDomain.reset_priority_by_ordered_ids(uneditable_domains.collect(&:id).reverse + ids)
   end
 
   # The default tenant is the tenant to be used when
@@ -327,7 +328,7 @@ class Tenant < ApplicationRecord
   # @return the attribute value
   def tenant_attribute(attr_name, setting_name)
     if use_config_for_attributes?
-      ret = get_vmdb_config.fetch_path(:server, setting_name)
+      ret = ::Settings.server[setting_name]
       block_given? ? yield(ret) : ret
     else
       self[attr_name]
@@ -342,6 +343,8 @@ class Tenant < ApplicationRecord
   end
 
   def get_vmdb_config
+    Vmdb::Deprecation.deprecation_warning("Tenant#get_vmdb_config",
+                                          "Prefer using ::Settings directly.", caller)
     @vmdb_config ||= VMDB::Config.new("vmdb").config
   end
 
@@ -360,6 +363,7 @@ class Tenant < ApplicationRecord
 
   def ensure_can_be_destroyed
     raise _("A tenant with groups associated cannot be deleted.") if miq_groups.non_tenant_groups.exists?
+    raise _("A tenant created by tenant mapping cannot be deleted") if source
   end
 
   def validate_default_tenant

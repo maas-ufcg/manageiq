@@ -11,3 +11,6 @@ datastore:
   :type: :ManagedObjectReference
 diskMoveType:
   :type: :SOAP::SOAPString
+profile:
+  :type: :VirtualMachineProfileSpec
+  :isArray: true

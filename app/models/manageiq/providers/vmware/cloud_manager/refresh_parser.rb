@@ -47,6 +47,8 @@ class ManageIQ::Providers::Vmware::CloudManager::RefreshParser < ManageIQ::Provi
     @inv[:orgs].each do |org|
       @inv[:vdcs] += org.vdcs.all
     end
+
+    process_collection(@inv[:vdcs], :availability_zones) { |vdc| parse_vdc(vdc) }
   end
 
   def get_vapps
@@ -91,6 +93,18 @@ class ManageIQ::Providers::Vmware::CloudManager::RefreshParser < ManageIQ::Provi
     end
 
     process_collection(@inv[:images], :vms) { |image_obj| parse_image(image_obj[:image], image_obj[:is_published]) }
+  end
+
+  def parse_vdc(vdc)
+    id = vdc.id
+
+    new_result = {
+      :type    => "ManageIQ::Providers::Vmware::CloudManager::AvailabilityZone",
+      :ems_ref => id,
+      :name    => vdc.name
+    }
+
+    return id, new_result
   end
 
   def parse_vm(vm)
@@ -193,7 +207,7 @@ class ManageIQ::Providers::Vmware::CloudManager::RefreshParser < ManageIQ::Provi
       :ems_ref     => uid,
       :name        => vapp_template.name,
       :description => vapp_template.description,
-      :orderable   => false,
+      :orderable   => true,
       :content     => content,
       # By default #save_orchestration_templates_inventory does not set the EMS
       # ID because templates are not EMS specific. We are setting the EMS

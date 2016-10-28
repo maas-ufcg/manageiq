@@ -206,7 +206,7 @@ describe ApplicationController do
       @user = nil
     end
 
-    it "lists all groups when (admin user is logged)" do
+    it "lists all non-tenant groups when (admin user is logged)" do
       login_as(admin_user)
       controller.instance_variable_set(:@ownership_items, @ownership_items)
       controller.instance_variable_set(:@_params, @params)
@@ -214,7 +214,7 @@ describe ApplicationController do
 
       controller.build_ownership_info
       groups = controller.instance_variable_get(:@groups)
-      expect(groups.count).to eq(MiqGroup.count)
+      expect(groups.count).to eq(MiqGroup.non_tenant_groups.count)
     end
 
     it "lists all users when (admin user is logged)" do
@@ -236,17 +236,6 @@ describe ApplicationController do
       users = controller.instance_variable_get(:@users)
       expected_ids = [great_grand_child_tenant.user_ids, grand_child_tenant.user_ids].flatten
       expect(expected_ids).to match_array(users.values(&:id).map(&:to_i))
-    end
-
-    it "lists all groups that are related to descendants tenats strategy" do
-      login_as(grand_child_user)
-      controller.instance_variable_set(:@ownership_items, @ownership_items)
-      controller.instance_variable_set(:@_params, @params)
-      controller.instance_variable_set(:@user, @user)
-      controller.build_ownership_info
-      groups = controller.instance_variable_get(:@groups)
-      expected_ids = [great_grand_child_tenant.miq_group_ids, grand_child_tenant.miq_group_ids].flatten
-      expect(expected_ids).to match_array(groups.values(&:id).map(&:to_i))
     end
   end
 end
@@ -339,7 +328,7 @@ describe HostController do
                               :ext_management_system => FactoryGirl.create(:ems_openstack_infra),
                               :storage               => FactoryGirl.create(:storage)
                              )
-      controller.instance_variable_set(:@_params, :miq_grid_checks => "#{vm.id}")
+      controller.instance_variable_set(:@_params, :miq_grid_checks => vm.id.to_s)
       expect(controller).to receive(:process_objects)
       controller.send(:vm_button_operation, 'scan', "Smartstate Analysis")
     end
@@ -365,7 +354,7 @@ describe ServiceController do
                                     :storage               => FactoryGirl.create(:storage)
                                    )
       controller.instance_variable_set(:@_params, :miq_grid_checks => "#{vm.id}, #{template.id}")
-      expect(controller).to receive(:render_flash_and_scroll)
+      expect(controller).to receive(:javascript_flash)
       controller.send(:vm_button_operation, 'retire_now', "Retirement")
       expect(response.status).to eq(200)
     end
@@ -382,7 +371,7 @@ describe ServiceController do
       controller.send(:vm_button_operation, 'retire_now', "Retirement")
       expect(response.status).to eq(200)
       expect(assigns(:flash_array).first[:message]).to \
-        include("Retirement initiated for 1 VM and Instance from the CFME Database")
+        include("Retirement initiated for 1 VM and Instance from the %{product} Database" % {:product => I18n.t('product.name')})
     end
 
     it "should continue to retire a service and does not render flash message 'xxx does not apply xxx' " do
@@ -399,7 +388,7 @@ describe ServiceController do
       controller.send(:vm_button_operation, 'retire_now', "Retirement")
       expect(response.status).to eq(200)
       expect(assigns(:flash_array).first[:message]).to \
-        include("Retirement initiated for 1 Service from the CFME Database")
+        include("Retirement initiated for 1 Service from the %{product} Database" % {:product => I18n.t('product.name')})
     end
   end
 end

@@ -1,8 +1,8 @@
 class ApplicationHelper::Button::GenericFeatureButton < ApplicationHelper::Button::Basic
-  needs_record
+  needs :@record
 
   def initialize(view_context, view_binding, instance_data, props)
-    super(view_context, view_binding, instance_data, props)
+    super
     @feature = props[:options][:feature]
   end
 

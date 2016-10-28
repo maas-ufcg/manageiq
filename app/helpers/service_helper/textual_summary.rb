@@ -65,7 +65,7 @@ module ServiceHelper::TextualSummary
   def textual_retirement_date
     {:label => _("Retirement Date"),
      :image => "retirement",
-     :value => (@record.retires_on.nil? ? _("Never") : @record.retires_on.to_time.strftime("%x"))}
+     :value => (@record.retires_on.nil? ? _("Never") : @record.retires_on.strftime("%x %R %Z"))}
   end
 
   def textual_retirement_state
@@ -73,7 +73,6 @@ module ServiceHelper::TextualSummary
   end
 
   def textual_catalog_item
-    # {:label => "Parent Catalog Item", :value => @record.service_template.name }
     st = @record.service_template
     s = {:label => _("Parent Catalog Item"), :image => "service_template", :value => (st.nil? ? _("None") : st.name)}
     if st && role_allows?(:feature => "catalog_items_accord")

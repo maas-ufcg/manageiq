@@ -10,16 +10,14 @@ class TreeBuilderOpsDiagnostics < TreeBuilderOps
 
   def set_locals_for_render
     locals = super
-    locals.merge!(
-      :id_prefix => "diagnostics_",
-      :autoload  => true
-    )
+    locals.merge!(:autoload => true)
   end
 
   def root_options
     region = MiqRegion.my_region
-    title =  _("CFME Region: %{region_description} [%{region}]") % {:region_description => region.description,
-                                                                    :region             => region.region}
+    title =  _("%{product} Region: %{region_description} [%{region}]") % {:region_description => region.description,
+                                                                          :region             => region.region,
+                                                                          :product            => I18n.t('product.name')}
     [title, title, :miq_region]
   end
 end

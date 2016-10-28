@@ -46,8 +46,8 @@ ManageIQ.angular.app.controller('pagingDivButtonGroupController', ['$scope', 'mi
       var compiledEnabledSave = $compile(enabledSaveHtml)($scope);
 
       $timeout(function () {
-        if (angular.element(document.getElementById('save_enabled')).length == 0) {
-          angular.element(document.getElementById($attrs.pagingDivButtonsId)).append(compiledEnabledSave);
+        if (!miqDomElementExists('save_enabled')) {
+          $('#' + $attrs.pagingDivButtonsId).append(compiledEnabledSave);
         }
       });
     } else {
@@ -62,12 +62,12 @@ ManageIQ.angular.app.controller('pagingDivButtonGroupController', ['$scope', 'mi
       var compiledEnabledSave = $compile(enabledSaveHtml)($scope);
 
       $timeout(function () {
-        if (angular.element(document.getElementById('save_disabled')).length == 0) {
-          angular.element(document.getElementById($attrs.pagingDivButtonsId)).append(compiledDisabledSave);
+        if (!miqDomElementExists('save_disabled')) {
+          $('#' + $attrs.pagingDivButtonsId).append(compiledDisabledSave);
         }
 
-        if (angular.element(document.getElementById('save_enabled')).length == 0) {
-          angular.element(document.getElementById($attrs.pagingDivButtonsId)).append(compiledEnabledSave);
+        if (!miqDomElementExists('save_enabled')) {
+          $('#' + $attrs.pagingDivButtonsId).append(compiledEnabledSave);
         }
       });
     }
@@ -81,8 +81,8 @@ ManageIQ.angular.app.controller('pagingDivButtonGroupController', ['$scope', 'mi
     var compiledReset = $compile(resetHtml)($scope);
 
     $timeout(function () {
-      if (angular.element(document.getElementById('reset_enabled_disabled')).length == 0) {
-        angular.element(document.getElementById($attrs.pagingDivButtonsId)).append(compiledReset);
+      if (!miqDomElementExists('reset_enabled_disabled')) {
+        $('#' + $attrs.pagingDivButtonsId).append(compiledReset);
       }
     });
   };
@@ -93,8 +93,8 @@ ManageIQ.angular.app.controller('pagingDivButtonGroupController', ['$scope', 'mi
     var compiledCancel = $compile(cancelHtml)($scope);
 
     $timeout(function () {
-      if (angular.element(document.getElementById('cancel_enabled')).length == 0) {
-        angular.element(document.getElementById($attrs.pagingDivButtonsId)).append(compiledCancel);
+      if (!miqDomElementExists('cancel_enabled')) {
+        $('#' + $attrs.pagingDivButtonsId).append(compiledCancel);
       }
     });
   };

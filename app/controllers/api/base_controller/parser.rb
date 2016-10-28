@@ -1,6 +1,8 @@
 module Api
   class BaseController
     module Parser
+      include CompressedIds
+
       def parse_api_request
         @req = RequestAdapter.new(request, params)
       end
@@ -11,7 +13,7 @@ module Api
         # API Version Validation
         if @req.version
           vname = @req.version
-          unless version_config[:definitions].collect { |vent| vent[:name] }.include?(vname)
+          unless Settings.version.definitions.collect { |vent| vent[:name] }.include?(vname)
             raise BadRequestError, "Unsupported API Version #{vname} specified"
           end
         end
@@ -22,7 +24,7 @@ module Api
         # Method Validation for the collection or sub-collection specified
         if cname && ctype
           mname = @req.method
-          unless collection_config.supports_http_method?(cname, mname)
+          unless collection_config.supports_http_method?(cname, mname) || mname == :options
             raise BadRequestError, "Unsupported HTTP Method #{mname} for the #{ctype} #{cname} specified"
           end
         end
@@ -70,7 +72,7 @@ module Api
       def parse_href(href)
         if href
           path = href.match(/^http/) ? URI.parse(href).path.sub(/\/*$/, '') : href
-          path = "#{@prefix}/#{path}" unless path.match(@prefix)
+          path = "/api/#{path}" unless path.match("/api")
           path = path.sub(/\/*$/, '')
           return href_collection_id(path)
         end
@@ -79,7 +81,7 @@ module Api
 
       def href_collection_id(path)
         path_array = path.split('/')
-        cidx = path_array[2] && path_array[2].match(version_config[:regex]) ? 3 : 2
+        cidx = path_array[2] && path_array[2].match(Settings.version.regex) ? 3 : 2
 
         collection, c_id    = path_array[cidx..cidx + 1]
         subcollection, s_id = path_array[cidx + 2..cidx + 3]
@@ -91,37 +93,43 @@ module Api
         return nil if resource.blank?
 
         href_id = href_id(resource["href"], collection)
-        return from_cid(href_id) if href_id.present?
-
-        resource["id"].kind_of?(Integer) ? resource["id"] : nil
+        case
+        when href_id.present?
+          href_id
+        when resource["id"].kind_of?(Integer)
+          resource["id"]
+        when cid?(resource["id"])
+          from_cid(resource["id"])
+        end
       end
 
       def href_id(href, collection)
-        href.match(%r{^.*/#{collection}/([0-9r]+)$}) && Regexp.last_match(1) if href.present?
+        if href.present? && href.match(%r{^.*/#{collection}/(#{CID_OR_ID_MATCHER})$})
+          from_cid(Regexp.last_match(1))
+        end
       end
 
-      def parse_by_attr(resource, type, attr_list)
+      def parse_by_attr(resource, type, attr_list = [])
         klass = collection_class(type)
-        objs = attr_list.map { |attr| klass.send("find_by_#{attr}", resource[attr]) if resource[attr] }.compact
+        attr_list |= %w(guid) if klass.attribute_method?(:guid)
+        attr_list |= String(collection_config[type].identifying_attrs).split(",")
+        objs = attr_list.map { |attr| klass.find_by(attr => resource[attr]) if resource[attr] }.compact
         objs.collect(&:id).first
       end
 
       def parse_owner(resource)
         return nil if resource.blank?
-        owner_id = parse_id(resource, :users)
-        owner_id ? owner_id : parse_by_attr(resource, :users, %w(name userid))
+        parse_id(resource, :users) || parse_by_attr(resource, :users)
       end
 
       def parse_group(resource)
         return nil if resource.blank?
-        group_id = parse_id(resource, :groups)
-        group_id ? group_id : parse_by_attr(resource, :groups, %w(description))
+        parse_id(resource, :groups) || parse_by_attr(resource, :groups)
       end
 
       def parse_role(resource)
         return nil if resource.blank?
-        role_id = parse_id(resource, :roles)
-        role_id ? role_id : parse_by_attr(resource, :roles, %w(name))
+        parse_id(resource, :roles) || parse_by_attr(resource, :roles)
       end
 
       def parse_tenant(resource)
@@ -214,7 +222,7 @@ module Api
         action_hash = fetch_action_hash(aspec, method_name, action_name)
         raise BadRequestError, "Disabled action #{action_name}" if action_hash[:disabled]
         unless api_user_role_allows?(action_hash[:identifier])
-          raise Forbidden, "Use of the #{action_name} action is forbidden"
+          raise ForbiddenError, "Use of the #{action_name} action is forbidden"
         end
       end
 
@@ -241,7 +249,9 @@ module Api
 
         if action_hash.present?
           raise BadRequestError, "Disabled Action #{aname} for the #{cname} #{type} specified" if action_hash[:disabled]
-          raise Forbidden, "Use of Action #{aname} is forbidden" unless api_user_role_allows?(action_hash[:identifier])
+          unless api_user_role_allows?(action_hash[:identifier])
+            raise ForbiddenError, "Use of Action #{aname} is forbidden"
+          end
         end
 
         validate_post_api_action_as_subcollection(cname, mname, aname)
@@ -289,7 +299,7 @@ module Api
         raise BadRequestError, "Disabled Action #{aname} for the #{cname} sub-collection" if action_hash[:disabled]
 
         unless api_user_role_allows?(action_hash[:identifier])
-          raise Forbidden, "Use of Action #{aname} for the #{cname} sub-collection is forbidden"
+          raise ForbiddenError, "Use of Action #{aname} for the #{cname} sub-collection is forbidden"
         end
       end
 

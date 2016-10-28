@@ -58,7 +58,18 @@ class ApplicationController < ActionController::Base
   before_action :get_global_session_data, :except => [:resize_layout, :window_sizes, :authenticate]
   before_action :set_user_time_zone, :except => [:window_sizes]
   before_action :set_gettext_locale, :except => [:window_sizes]
+  before_action :allow_websocket
   after_action :set_global_session_data, :except => [:resize_layout, :window_sizes]
+
+  def local_request?
+    Rails.env.development? || Rails.env.test?
+  end
+
+  def allow_websocket
+    proto = request.ssl? ? 'wss' : 'ws'
+    override_content_security_policy_directives(:connect_src => ["'self'", "#{proto}://#{request.env['HTTP_HOST']}"])
+  end
+  private :allow_websocket
 
   def reset_toolbar
     @toolbars = {}
@@ -221,6 +232,10 @@ class ApplicationController < ActionController::Base
   end
   private :browser_refresh_task
 
+  #
+  # :task_id => id of task to wait for
+  # :action  => 'action_to_call' -- action to be called when the task finishes
+  #
   def initiate_wait_for_task(options = {})
     task_id = options[:task_id]
     session[:async] ||= {}
@@ -229,6 +244,9 @@ class ApplicationController < ActionController::Base
 
     session[:async][:params]           = copy_hash(params)  # Save the incoming parms
     session[:async][:params][:task_id] = task_id
+
+    # override method to be called, when the task is done
+    session[:async][:params][:action] = options[:action] if options.key?(:action)
 
     browser_refresh_task(task_id)
   end
@@ -343,17 +361,14 @@ class ApplicationController < ActionController::Base
       if @sb[:active_tab] == "diagnostics_database"
         # coming from diagnostics/database tab
         pfx = "dbbackup"
-        flash_div_num = "database"
       end
     else
       if session[:edit] && session[:edit].key?(:pxe_id)
         # add/edit pxe server
         pfx = "pxe"
-        flash_div_num = ""
       else
         # add/edit dbbackup schedule
         pfx = "schedule"
-        flash_div_num = ""
       end
     end
 
@@ -376,17 +391,14 @@ class ApplicationController < ActionController::Base
         msg = _('Depot Settings successfuly validated')
         MiqSchedule.new.verify_file_depot(settings)
       end
-    rescue StandardError => bang
+    rescue => bang
       add_flash(_("Error during 'Validate': %{error_message}") % {:error_message => bang.message}, :error)
     else
       add_flash(msg)
     end
 
     @changed = (@edit[:new] != @edit[:current]) if pfx == "pxe"
-    render :update do |page|
-      page << javascript_prologue
-      page.replace("flash_msg_div#{flash_div_num}", :partial => "layouts/flash_msg", :locals => {:div_num => flash_div_num})
-    end
+    javascript_flash
   end
 
   # to reload currently displayed summary screen in explorer
@@ -403,24 +415,7 @@ class ApplicationController < ActionController::Base
   protected
 
   def render_flash(add_flash_text = nil, severity = nil)
-    add_flash(add_flash_text, severity) if add_flash_text
-    render :update do |page|
-      page << javascript_prologue
-      page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-      yield(page) if block_given?
-    end
-  end
-
-  def render_flash_and_scroll(*args)
-    render_flash(*args) do |page|
-      page << '$("#main_div").scrollTop(0);'
-    end
-  end
-
-  def render_flash_and_stop_sparkle(*args)
-    render_flash(*args) do |page|
-      page << "miqSparkle(false);"
-    end
+    javascript_flash(:text => add_flash_text, :severity => severity)
   end
 
   def tagging_explorer_controller?
@@ -479,8 +474,9 @@ class ApplicationController < ActionController::Base
       end
     end
 
-    tree = TreeBuilderAeClass.new(name, type, @sb)
-    @automate_tree = tree.tree_nodes if name == :automate_tree
+    tree_klass = name == :ae_tree ? TreeBuilderAeClass : TreeBuilderAutomate
+    tree = tree_klass.new(name, type, @sb)
+    @automate_tree = tree if name == :automate_tree
     tree
   end
 
@@ -630,7 +626,7 @@ class ApplicationController < ActionController::Base
   end
 
   def report_edit_aborted(lastaction)
-    add_flash(_("Edit aborted!  CFME does not support the browser's back button or access from multiple tabs or windows of the same browser.  Please close any duplicate sessions before proceeding."), :error)
+    add_flash(_("Edit aborted!  %{product} does not support the browser's back button or access from multiple tabs or windows of the same browser.  Please close any duplicate sessions before proceeding.") % {:product => I18n.t('product.name')}, :error)
     session[:flash_msgs] = @flash_array.dup
     if request.xml_http_request?  # Is this an Ajax request?
       if lastaction == "configuration"
@@ -913,6 +909,10 @@ class ApplicationController < ActionController::Base
           celltext = Dictionary.gettext(row[col], :type => :model, :notfound => :titleize)
         when 'approval_state'
           celltext = _(PROV_STATES[row[col]])
+        when "result"
+          new_row[:cells] << {:span => result_span_class(row[col]), :text => row[col].titleize}
+        when "severity"
+          new_row[:cells] << {:span => severity_span_class(row[col]), :text => row[col].titleize}
         when 'state'
           celltext = row[col].titleize
         when 'hardware.bitness'
@@ -925,7 +925,7 @@ class ApplicationController < ActionController::Base
           celltext = format_col_for_display(view, row, col, celltz || tz)
         end
 
-        new_row[:cells] << {:text => celltext}
+        new_row[:cells] << {:text => celltext} if celltext
       end
 
       if @row_button # Show a button in the last col
@@ -937,6 +937,28 @@ class ApplicationController < ActionController::Base
     end
 
     root
+  end
+
+  def result_span_class(value)
+    case value.downcase
+    when "pass"
+      "label label-success center-block"
+    when "fail"
+      "label label-danger center-block"
+    else
+      "label label-primary center-block"
+    end
+  end
+
+  def severity_span_class(value)
+    case value.downcase
+    when "high"
+      "label label-danger center-block"
+    when "medium"
+      "label label-warning center-block"
+    else
+      "label label-low-severity center-block"
+    end
   end
 
   def calculate_pct_img(val)
@@ -1030,6 +1052,11 @@ class ApplicationController < ActionController::Base
       @title = new_bc [:name].slice(0..50) + "..."  # Set the title to be the new breadcrumb
     else
       @title = new_bc [:name] # Set the title to be the new breadcrumb
+    end
+
+    # Modify user feedback for quick searches when not found
+    unless @search_text.blank?
+      @title += _(" (Names with \"%{search_text}\")") % {:search_text => @search_text}
     end
   end
 
@@ -1387,12 +1414,12 @@ class ApplicationController < ActionController::Base
       end
     end
     if success_count > 0
-      add_flash(n_("Successfully deleted Saved Report from the CFME Database",
-                   "Successfully deleted Saved Reports from the CFME Database", success_count))
+      add_flash(n_("Successfully deleted Saved Report from the %{product} Database",
+                   "Successfully deleted Saved Reports from the %{product} Database", success_count) % {:product => I18n.t('product.name')})
     end
     if failure_count > 0
-      add_flash(n_("Error during Saved Report delete from the CFME Database",
-                   "Error during Saved Reports delete from the CFME Database", failure_count))
+      add_flash(n_("Error during Saved Report delete from the %{product} Database",
+                   "Error during Saved Reports delete from the %{product} Database", failure_count) % {:product => I18n.t('product.name')})
     end
   end
 
@@ -1915,7 +1942,7 @@ class ApplicationController < ActionController::Base
       session[:tab_url][:opt] = inbound_url if ["utilization", "planning", "bottlenecks", "waste"].include?(action_name)
     when "catalog", "vm", "vm_or_template", "miq_template", "service"
       session[:tab_url][:svc] = inbound_url if ["show", "show_list", "explorer"].include?(action_name)
-    when "availability_zone", "ems_cloud", "flavor", "vm_cloud", "orchestration_stack"
+    when "availability_zone", "host_aggregate", "ems_cloud", "flavor", "vm_cloud", "orchestration_stack"
       session[:tab_url][:compute] = session[:tab_url][:clo] = inbound_url if ["show", "show_list", "explorer"].include?(action_name)
     when "ems_cluster","ems_ph_infra", "ems_infra", "host", "pxe", "resource_pool", "storage", "vm_infra"
       session[:tab_url][:compute] = session[:tab_url][:inf] = inbound_url if ["show", "show_list", "explorer"].include?(action_name)
@@ -2153,7 +2180,7 @@ class ApplicationController < ActionController::Base
 
       when "ontap_storage_system", "ontap_logical_disk", "cim_base_storage_extent", "ontap_storage_volume", "ontap_file_share", "snia_local_file_system", "storage_manager"
         session[:tab_bc][:sto] = @breadcrumbs.dup if ["show", "show_list", "index"].include?(action_name)
-      when "ems_cloud", "availability_zone", "flavor"
+      when "ems_cloud", "availability_zone", "host_aggregate", "flavor"
         session[:tab_bc][:clo] = @breadcrumbs.dup if ["show", "show_list"].include?(action_name)
       when "ems_ph_infra","ems_infra", "datacenter", "ems_cluster", "resource_pool", "storage", "pxe_server"
         session[:tab_bc][:inf] = @breadcrumbs.dup if ["show", "show_list"].include?(action_name)
@@ -2216,9 +2243,9 @@ class ApplicationController < ActionController::Base
     @sb[:detail_sortdir] = @detail_sortdir
 
     @sb[:tree_hosts_hash] = nil if !%w(ems_folders descendant_vms).include?(params[:display]) &&
-                                   !%w(treesize tree_autoload_dynatree tree_autoload_quads).include?(params[:action])
+                                   !%w(treesize tree_autoload).include?(params[:action])
     @sb[:tree_vms_hash] = nil if !%w(ems_folders descendant_vms).include?(params[:display]) &&
-                                 !%w(treesize tree_autoload_dynatree tree_autoload_quads).include?(params[:action])
+                                 !%w(treesize tree_autoload).include?(params[:action])
 
     # Set/clear sandbox (@sb) per controller in the session object
     session[:sandboxes] ||= HashWithIndifferentAccess.new
@@ -2313,7 +2340,7 @@ class ApplicationController < ActionController::Base
       begin
         authrec = find_by_id_filtered(model.constantize, id)
       rescue ActiveRecord::RecordNotFound
-      rescue StandardError => @bang
+      rescue => @bang
       end
     end
     if rec.nil?
@@ -2381,7 +2408,7 @@ class ApplicationController < ActionController::Base
     add_flash(_("%{task} does not apply to at least one of the selected %{model}") %
                 {:model => model_type,
                  :task  => type.split.map(&:capitalize).join(' ')}, :error)
-    render_flash_and_scroll if @explorer
+    javascript_flash(:scroll_top => true) if @explorer
   end
 
   def set_gettext_locale

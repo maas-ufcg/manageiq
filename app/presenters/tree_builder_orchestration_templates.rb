@@ -8,10 +8,7 @@ class TreeBuilderOrchestrationTemplates < TreeBuilder
 
   def set_locals_for_render
     locals = super
-    locals.merge!(
-      :id_prefix => 'ot_',
-      :autoload  => 'true'
-    )
+    locals.merge!(:autoload => 'true')
   end
 
   def root_options
@@ -39,9 +36,14 @@ class TreeBuilderOrchestrationTemplates < TreeBuilder
        :tree  => "otvnf_tree",
        :text  => _("VNF Templates"),
        :image => "orchestration_template_vnfd",
-       :tip   => _("VNF Templates")}
+       :tip   => _("VNF Templates")},
+      {:id    => 'otvap',
+       :tree  => "otvap_tree",
+       :text  => _("vApp Templates"),
+       :image => "orchestration_template_vapp",
+       :tip   => _("vApp Templates")}
     ]
-    count_only ? children.length : children
+    count_only_or_objects(count_only, children)
   end
 
   def x_get_tree_custom_kids(object, count_only, _options)
@@ -49,9 +51,9 @@ class TreeBuilderOrchestrationTemplates < TreeBuilder
       "otcfn" => OrchestrationTemplateCfn,
       "othot" => OrchestrationTemplateHot,
       "otazu" => OrchestrationTemplateAzure,
-      "otvnf" => OrchestrationTemplateVnfd
+      "otvnf" => OrchestrationTemplateVnfd,
+      "otvap" => ManageIQ::Providers::Vmware::CloudManager::OrchestrationTemplate
     }
-    objects = Rbac.filtered(classes[object[:id]].where(["orderable=?", true])).sort_by { |o| o.name.downcase }
-    count_only_or_objects(count_only, objects)
+    count_only_or_objects_filtered(count_only, classes[object[:id]].where(["orderable=?", true]), "name")
   end
 end

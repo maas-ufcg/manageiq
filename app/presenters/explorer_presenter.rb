@@ -72,7 +72,8 @@ class ExplorerPresenter
       :exp                  => {},
       :osf_node             => '',
       :show_miq_buttons     => false,
-      :load_chart           => nil
+      :load_chart           => nil,
+      :open_window          => nil,
     }.update(options)
   end
 
@@ -96,8 +97,18 @@ class ExplorerPresenter
     self
   end
 
+  def activate_tree_node(options)
+    @options[:activate_node] = options
+    self
+  end
+
   def spinner_off
     @options[:spinner_off] = true
+    self
+  end
+
+  def scroll_top
+    @options[:scroll_top] = true
     self
   end
 
@@ -146,6 +157,10 @@ class ExplorerPresenter
     self
   end
 
+  def self.open_window(url)
+    new(:mode => 'window', :open_url => url)
+  end
+
   def []=(key, value)
     @options[key] = value
   end
@@ -159,6 +174,7 @@ class ExplorerPresenter
     when 'main_div' then for_render_main_div
     when 'flash'    then for_render_flash
     when 'buttons'  then for_render_buttons
+    when 'window'   then for_render_window
     else for_render_default
     end
   end
@@ -168,6 +184,17 @@ class ExplorerPresenter
   def for_render_flash
     data = {:explorer => 'flash'}
     data[:replacePartials] = @options[:replace_partials]
+    data[:spinnerOff] = true if @options[:spinner_off]
+    data[:scrollTop] = true if @options[:scroll_top]
+    data[:focus] = @options[:focus] if @options[:focus]
+    data[:activateNode] = @options[:activate_node] if @options[:activate_node]
+    data
+  end
+
+  def for_render_window
+    data = {:explorer => 'window'}
+    data[:openUrl] = @options[:open_url]
+    data[:spinnerOff] = true if @options[:spinner_off]
     data
   end
 
@@ -189,7 +216,7 @@ class ExplorerPresenter
   end
 
   def for_render_default
-    data = {:explorer => 'replace_right_cell'}
+    data = {:explorer => 'replace_right_cell', :scrollTop => true}
 
     if @options[:exp].present?
       data.store_path(:expEditor, :first, :type,   @options[:exp][:val1_type]) if @options[:exp][:val1_type]
@@ -208,7 +235,7 @@ class ExplorerPresenter
       :activeTree => @options[:active_tree],
       :key        => @options[:add_nodes][:key],
       :osf        => @options[:osf_node],
-      :children   => @options[:add_nodes][:children],
+      :nodes      => @options[:add_nodes][:nodes],
       :remove     => !!@options[:remove_nodes],
     } if @options[:add_nodes]
 

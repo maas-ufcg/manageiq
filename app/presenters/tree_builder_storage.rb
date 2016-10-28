@@ -7,10 +7,7 @@ class TreeBuilderStorage < TreeBuilder
 
   def set_locals_for_render
     locals = super
-    locals.merge!(
-      :id_prefix => "ds_",
-      :autoload  => true
-    )
+    locals.merge!(:autoload => true)
   end
 
   def root_options
@@ -29,6 +26,6 @@ class TreeBuilderStorage < TreeBuilder
   def x_get_tree_custom_kids(object, count_only, options)
     return count_only ? 0 : [] if object[:id] != "global"
     objects = MiqSearch.where(:db => options[:leaf]).visible_to_all
-    count_only ? objects.length : objects.sort_by { |a| a.description.downcase }
+    count_only_or_objects(count_only, objects, "description")
   end
 end

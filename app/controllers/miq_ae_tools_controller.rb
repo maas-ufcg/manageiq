@@ -35,7 +35,7 @@ class MiqAeToolsController < ApplicationController
   def log
     @breadcrumbs = []
     @log = $miq_ae_logger.contents if $miq_ae_logger
-    add_flash(_("Logs for this CFME Server are not available for viewing"), :warning) if @log.blank?
+    add_flash(_("Logs for this %{product} Server are not available for viewing") % {:product => I18n.t('product.name')}, :warning) if @log.blank?
     @lastaction = "log"
     @layout = "miq_ae_logs"
     @msg_title = "AE"
@@ -47,7 +47,7 @@ class MiqAeToolsController < ApplicationController
   def refresh_log
     assert_privileges("refresh_log")
     @log = $miq_ae_logger.contents if $miq_ae_logger
-    add_flash(_("Logs for this CFME Server are not available for viewing"), :warning) if @log.blank?
+    add_flash(_("Logs for this %{product} Server are not available for viewing") % {:product => I18n.t('product.name')}, :warning) if @log.blank?
     replace_main_div :partial => "layouts/log_viewer",
                      :locals  => {:legend_text => _("Last 1000 lines from the Automation log")}
   end
@@ -108,7 +108,7 @@ class MiqAeToolsController < ApplicationController
   def automate_json
     begin
       automate_json = automate_import_json_serializer.serialize(ImportFileUpload.find(params[:import_file_upload_id]))
-    rescue StandardError => e
+    rescue => e
       add_flash(_("Error: import processing failed: %{message}") % {:message => e.message}, :error)
     end
 
@@ -201,7 +201,7 @@ Methods updated/added: %{method_stats}") % stat_options, :success)
 
     if git_url.blank?
       add_flash(_("Please provide a valid git URL"), :error)
-    elsif !MiqRegion.my_region.role_active?("git_owner")
+    elsif !GitBasedDomainImportService.available?
       add_flash(_("Please enable the git owner role in order to import git repositories"), :error)
     else
       if GitRepository.exists?(:url => git_url)
@@ -263,7 +263,7 @@ Classes updated/added: %{class_stats}
 Instances updated/added: %{instance_stats}
 Methods updated/added: %{method_stats}") % stat_options)
         redirect_to :action => 'import_export', :flash_msg => @flash_array[0][:message]         # redirect to build the retire screen
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("Error during 'upload': %{message}") % {:message => bang.message}, :error)
         redirect_to :action => 'import_export', :flash_msg => @flash_array[0][:message], :flash_error => true         # redirect to build the retire screen
       end
@@ -299,11 +299,7 @@ Methods updated/added: %{method_stats}") % stat_options)
       self.x_node = "root" if x_active_tree == :ae_tree && x_tree
       add_flash(_("All custom classes and instances have been reset to default"))
     end
-    render :update do |page|
-      page << javascript_prologue
-      page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-      page << "miqSparkle(false);"
-    end
+    javascript_flash(:spinner_off => true)
   end
 
   private ###########################

@@ -6,7 +6,7 @@ class MiqAeNamespace < ApplicationRecord
   EXPORT_EXCLUDE_KEYS = [/^id$/, /_id$/, /^created_on/, /^updated_on/,
                          /^updated_by/, /^reserved$/, /^commit_message/,
                          /^commit_time/, /^commit_sha/, /^ref$/, /^ref_type$/,
-                         /^last_import_on/].freeze
+                         /^last_import_on/, /^source/, /^top_level_namespace/].freeze
 
   belongs_to :parent,        :class_name => "MiqAeNamespace",  :foreign_key => :parent_id
   has_many   :ae_namespaces, :class_name => "MiqAeNamespace",  :foreign_key => :parent_id,    :dependent => :destroy
@@ -14,7 +14,7 @@ class MiqAeNamespace < ApplicationRecord
 
   validates_presence_of   :name
   validates_format_of     :name, :with    => /\A[\w\.\-\$]+\z/i,
-                                 :message => N_("only alpha numeric and _ . - $ characters are allowed")
+                                 :message => N_("may contain only alphanumeric and _ . - $ characters")
   validates_uniqueness_of :name, :scope => :parent_id
 
   def self.find_by_fqname(fqname, include_classes = true)

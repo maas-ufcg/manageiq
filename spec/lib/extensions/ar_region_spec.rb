@@ -22,12 +22,16 @@ describe "AR Regions extension" do
   end
 
   it ".compressed_id?" do
-    expect(base_class.compressed_id?(5)).to     be_falsey
-    expect(base_class.compressed_id?(15)).to    be_falsey
-    expect(base_class.compressed_id?(25)).to    be_falsey
-    expect(base_class.compressed_id?("5")).to   be_falsey
-    expect(base_class.compressed_id?("1r5")).to be_truthy
-    expect(base_class.compressed_id?("2r5")).to be_truthy
+    expect(base_class.compressed_id?(5)).to        be_truthy
+    expect(base_class.compressed_id?(15)).to       be_truthy
+    expect(base_class.compressed_id?("5")).to      be_truthy
+    expect(base_class.compressed_id?('100023')).to be_truthy
+    expect(base_class.compressed_id?('1r23')).to   be_truthy
+    expect(base_class.compressed_id?('10r10')).to  be_truthy
+    expect(base_class.compressed_id?('hello')).to  be_falsey
+    expect(base_class.compressed_id?('r1')).to     be_falsey
+    expect(base_class.compressed_id?('1r')).to     be_falsey
+    expect(base_class.compressed_id?('1rr1')).to   be_falsey
   end
 
   it ".split_id" do
@@ -49,6 +53,22 @@ describe "AR Regions extension" do
     expect(base_class.uncompress_id("5")).to eq(5)
     expect(base_class.uncompress_id("1r5")).to eq(15)
     expect(base_class.uncompress_id("2r5")).to eq(25)
+  end
+
+  describe ".group_ids_by_region" do
+    it "works with integer ids" do
+      one_region = [1, 2, 3, 4]
+      expect(base_class.group_ids_by_region(one_region)).to eq(0 => [1, 2, 3, 4])
+      multiple_regions = [1, 2, 991, 992]
+      expect(base_class.group_ids_by_region(multiple_regions)).to eq(0 => [1, 2], 99 => [991, 992])
+    end
+
+    it "works with string ids" do
+      one_region_string = %w(1 2 3 4)
+      expect(base_class.group_ids_by_region(one_region_string)).to eq(0 => %w(1 2 3 4))
+      multiple_regions_string = %w(1 2 991 992)
+      expect(base_class.group_ids_by_region(multiple_regions_string)).to eq(0 => %w(1 2), 99 => %w(991 992))
+    end
   end
 
   context "with some records" do

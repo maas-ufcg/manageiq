@@ -166,6 +166,12 @@ class MiqScheduleWorker::Runner < MiqWorker::Runner
       enqueue :orchestration_stack_retirement_check
     end
 
+    # Schedule - Check for Retired Load Balancers
+    every = worker_setting_or_default(:load_balancer_retired_interval)
+    @schedules[:scheduler] << system_schedule_every(every, :first_in => every) do
+      enqueue :load_balancer_retirement_check
+    end
+
     # Schedule - Periodic validation of authentications
     every = worker_setting_or_default(:authentication_check_interval, 1.day)
     @schedules[:scheduler] << system_schedule_every(every, :first_in => every) do
@@ -222,6 +228,19 @@ class MiqScheduleWorker::Runner < MiqWorker::Runner
       @schedules[:scheduler] << system_schedule_every(every, :first_in => every) do
         enqueue [:ems_refresh_timer, klass]
       end
+    end
+
+    # run run chargeback generation every day at specific time
+    schedule_chargeback_report_for_service_daily
+  end
+
+  def schedule_chargeback_report_for_service_daily
+    every = worker_setting_or_default(:chargeback_generation_interval, 1.day)
+    at = worker_setting_or_default(:chargeback_generation_time_utc, "01:00:00")
+    time_at = Time.current.strftime("%Y-%m-%d #{at}").to_time(:utc)
+    time_at += 1.day if time_at < Time.current + 1.hour
+    @schedules[:scheduler] << system_schedule_every(every, :first_at => time_at) do
+      enqueue [:generate_chargeback_for_service, :report_source => "Daily scheduler"]
     end
   end
 
@@ -520,7 +539,7 @@ class MiqScheduleWorker::Runner < MiqWorker::Runner
         end
       rescue Exception => err
         msg = "Error adjusting schedules: #{err.message}"
-        _log.error("#{msg}")
+        _log.error(msg)
         _log.log_backtrace(err)
         do_exit("#{msg}. Restarting.", 1)
       end
@@ -549,7 +568,7 @@ class MiqScheduleWorker::Runner < MiqWorker::Runner
       rescue ActiveRecord::StatementInvalid, SystemExit
         raise
       rescue Exception => err
-        _log.error("#{err.message}")
+        _log.error(err.message)
         _log.log_backtrace(err)
       end
       Thread.pass

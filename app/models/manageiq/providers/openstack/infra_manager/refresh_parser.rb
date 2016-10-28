@@ -119,7 +119,7 @@ module ManageIQ
             cloud_ems.with_provider_connection do |connection|
               compute_hosts = connection.hosts.select { |x| x.service_name == "compute" }
             end
-          rescue StandardError => err
+          rescue => err
             _log.error "Error Class=#{err.class.name}, Message=#{err.message}"
             $log.error err.backtrace.join("\n")
             # Just log the error and continue the refresh, we don't want error in cloud side to affect infra refresh
@@ -153,7 +153,12 @@ module ManageIQ
 
       def get_introspection_details(host)
         return {} unless @introspection_service
-        @introspection_service.get_introspection_details(host.uuid).body
+        begin
+          @introspection_service.get_introspection_details(host.uuid).body
+        rescue
+          # introspection data not available
+          {}
+        end
       end
 
       def get_extra_attributes(introspection_details)
@@ -231,6 +236,13 @@ module ManageIQ
           :guest_os_full_name   => nil,
           :guest_os             => nil,
           :disks                => process_host_hardware_disks(extra_attributes),
+          :introspected         => !introspection_details.blank?,
+          # fog-openstack baremetal service defaults to Ironic API v1.1.
+          # In version 1.1 "available" is shown as null in JSON. It is correctly
+          # shown as "available" starting with version 1.2.
+          # This may need to change once this issue is addressed:
+          # https://github.com/fog/fog-openstack/issues/197
+          :provision_state      => host.provision_state.nil? ? "available" : host.provision_state,
         }
       end
 

@@ -19,6 +19,11 @@ module Api
         delete_custom_attribute(object, ca)
       end
 
+      def delete_resource_custom_attributes(parent, _type, id, data)
+        ca = find_custom_attribute(parent, id, data)
+        delete_custom_attribute(parent, ca)
+      end
+
       private
 
       def add_custom_attribute(object, data)
@@ -67,7 +72,7 @@ module Api
 
       def new_custom_attribute(data)
         name = data["name"].to_s.strip
-        raise Api::BaseController::BadRequestError, "Must specify a name for a custom attribute to be added" if name.blank?
+        raise BadRequestError, "Must specify a name for a custom attribute to be added" if name.blank?
         CustomAttribute.new(:name    => name,
                             :value   => data["value"],
                             :source  => data["source"].blank? ? "EVM" : data["source"],

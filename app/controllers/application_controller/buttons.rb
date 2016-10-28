@@ -116,7 +116,7 @@ module ApplicationController::Buttons
         page.replace("ab_form", :partial => "shared/buttons/ab_form")
       end
       if params[:visibility_typ]
-        page.replace("form_role_visibility", :partial => "layouts/role_visibility", :locals => {:rec_id => "#{@custom_button.id || "new"}", :action => "automate_button_field_changed"})
+        page.replace("form_role_visibility", :partial => "layouts/role_visibility", :locals => {:rec_id => (@custom_button.id.to_s || "new"), :action => "automate_button_field_changed"})
       end
       unless params[:target_class]
         @changed = (@edit[:new] != @edit[:current])
@@ -267,7 +267,7 @@ module ApplicationController::Buttons
     else
       begin
         button.invoke(obj)    # Run the task
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("Error executing: \"%{task_description}\" %{error_message}") %
           {:task_description => params[:desc], :error_message => bang.message}, :error) # Push msg and error flag
       else

@@ -45,12 +45,13 @@ module ReportFormatter
     # report building methods
     def build_document_header
       super
-      type = c3_convert_type("#{mri.graph[:type]}")
+      type = c3_convert_type(mri.graph[:type].to_s)
       mri.chart = {
         :miqChart => type,
         :data     => {:columns => [], :names => {}},
         :axis     => {:x => {:tick => {}}, :y => {:tick => {}}},
-        :tooltip  => {}
+        :tooltip  => {},
+        :miq      => {}
       }
 
       if chart_is_2d?
@@ -107,9 +108,11 @@ module ReportFormatter
 
     def no_records_found_chart(*)
       mri.chart = {
-        :data => {
-          :columns => []
-        }
+        :miqChart => 'Line',
+        :data     => {:columns => [], :names => {}},
+        :axis     => {:x => {:tick => {}}, :y => {:tick => {}}},
+        :tooltip  => {},
+        :miq      => {}
       }
     end
 

@@ -23,7 +23,7 @@ module Api
 
       def tags_create_resource(parent, _type, _id, data)
         entry = parent.add_entry(data)
-        raise BadRequestError, "#{entry.errors.full_messages.join(', ')}" unless entry.valid?
+        raise BadRequestError, entry.errors.full_messages.join(', ') unless entry.valid?
         entry.tag
       rescue => err
         raise BadRequestError, "Could not create a new tag - #{err}"
@@ -85,7 +85,7 @@ module Api
 
       def parse_tag_from_href(data)
         href = data["href"]
-        tag  = if href && href.match(%r{^.*/tags/[0-9r]+$})
+        tag  = if href && href.match(%r{^.*/tags/#{CID_OR_ID_MATCHER}$})
                  klass = collection_class(:tags)
                  klass.find(from_cid(href.split('/').last))
                end

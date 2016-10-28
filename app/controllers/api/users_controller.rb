@@ -3,6 +3,10 @@ module Api
     INVALID_USER_ATTRS = %w(id href current_group_id settings).freeze # Cannot update other people's settings
     INVALID_SELF_USER_ATTRS = %w(id href current_group_id).freeze
 
+    include Subcollections::Tags
+
+    skip_before_action :validate_api_action, :only => :update
+
     def update
       aname = @req.action
       if aname == "edit" && !api_user_role_allows?(aname) && update_target_is_api_user?
@@ -13,11 +17,12 @@ module Api
         end
         render_normal_update :users, update_collection(:users, @req.c_id)
       else
+        validate_api_action
         super
       end
     end
 
-    def create_resource_users(_type, _id, data)
+    def create_resource(_type, _id, data)
       validate_user_create_data(data)
       parse_set_group(data)
       raise BadRequestError, "Must specify a valid group for creating a user" unless data["miq_groups"]
@@ -29,17 +34,17 @@ module Api
       user
     end
 
-    def edit_resource_users(type, id, data)
+    def edit_resource(type, id, data)
       (id == @auth_user_obj.id) ? validate_self_user_data(data) : validate_user_data(data)
       parse_set_group(data)
       parse_set_settings(data, resource_search(id, type, collection_class(type)))
-      edit_resource(type, id, data)
+      super
     end
 
-    def delete_resource_users(type, id = nil, data = nil)
+    def delete_resource(type, id = nil, data = nil)
       raise BadRequestError, "Must specify an id for deleting a user" unless id
       raise BadRequestError, "Cannot delete user of current request" if id.to_i == @auth_user_obj.id
-      delete_resource(type, id, data)
+      super
     end
 
     private

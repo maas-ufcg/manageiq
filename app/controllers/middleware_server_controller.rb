@@ -45,6 +45,17 @@ class MiddlewareServerController < ApplicationController
                                     :hawk  => N_('Not deploying to Hawkular server'),
                                     :msg   => N_('Deployment initiated for selected server(s)'),
                                     :param => :file
+    },
+    :middleware_add_jdbc_driver => {:op    => :add_middleware_jdbc_driver,
+                                    :skip  => false,
+                                    :msg   => N_('JDBC Driver installation'),
+                                    :param => :driver
+    },
+    :middleware_add_datasource  => {:op    => :add_middleware_datasource,
+                                    :skip  => false,
+                                    :hawk  => N_('Not adding new datasource to Hawkular server'),
+                                    :msg   => N_('New datasource initiated for selected server(s)'),
+                                    :param => :datasource
     }
   }.freeze
 
@@ -62,11 +73,57 @@ class MiddlewareServerController < ApplicationController
       params[:file] = {
         :file         => params["file"],
         :enabled      => params["enabled"],
+        :force_deploy => params["forceDeploy"],
         :runtime_name => params["runtimeName"]
       }
       run_server_operation(OPERATIONS.fetch(:middleware_add_deployment), selected_server)
       render :json => {
         :status => :success, :msg => _("Deployment \"%s\" has been initiated on this server.") % deployment_name
+      }
+    end
+  end
+
+  def add_jdbc_driver
+    selected_server = identify_selected_entities
+
+    params[:driver] = {
+      :file                 => params["file"],
+      :driver_name          => params["driverName"],
+      :driver_jar_name      => params["driverJarName"],
+      :module_name          => params["moduleName"],
+      :driver_class         => params["driverClass"],
+      :driver_major_version => params["majorVersion"],
+      :driver_minor_version => params["minorVersion"]
+    }
+
+    run_server_operation(OPERATIONS.fetch(:middleware_add_jdbc_driver), selected_server)
+    render :json => {
+      :status => :success, :msg => _("JDBC Driver \"%s\" has been installed on this server.") % params["driverName"]
+    }
+  end
+
+  def add_datasource
+    datasource_name = params["datasourceName"]
+    selected_server = identify_selected_entities
+    existing_datasource = MiddlewareDatasource.find_by(:name => datasource_name, :server_id => selected_server)
+
+    if existing_datasource
+      render :json => {
+        :status => :warn, :msg => _("Datasource \"%s\" already exists on this server.") % datasource_name
+      }
+    else
+      params[:datasource] = {
+        :datasourceName => datasource_name,
+        :xaDatasource   => params["xaDatasource"],
+        :jndiName       => params["jndiName"],
+        :driverName     => params["driverName"],
+        :driverClass    => params["driverClass"],
+        :connectionUrl  => params["connectionUrl"]
+      }
+
+      run_server_operation(OPERATIONS.fetch(:middleware_add_datasource), selected_server)
+      render :json => {
+        :status => :success, :msg => _("Datasource \"%s\" has been installed on this server.") % params["datasource"]
       }
     end
   end

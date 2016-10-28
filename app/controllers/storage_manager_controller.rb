@@ -37,20 +37,14 @@ class StorageManagerController < ApplicationController
       else
         javascript_redirect :action => @refresh_partial, :id => @redirect_id
       end
+    elsif @refresh_div == "main_div" && @lastaction == "show_list"
+      replace_gtl_main_div
+    elsif @refresh_div == "flash_msg_div"
+      javascript_flash
     else
-      if @refresh_div == "main_div" && @lastaction == "show_list"
-        replace_gtl_main_div
-      else
-        render :update do |page|
-          page << javascript_prologue
-          unless @refresh_partial.nil?
-            if @refresh_div == "flash_msg_div"
-              page.replace(@refresh_div, :partial => @refresh_partial)
-            else
-              page.replace_html(@refresh_div, :partial => @refresh_partial)
-            end
-          end
-        end
+      render :update do |page|
+        page << javascript_prologue
+        page.replace_html(@refresh_div, :partial => @refresh_partial)
       end
     end
   end
@@ -113,8 +107,8 @@ class StorageManagerController < ApplicationController
       @in_a_form = true
       begin
         verify_sm.verify_credentials
-      rescue StandardError => bang
-        add_flash("#{bang}", :error)
+      rescue => bang
+        add_flash(bang.to_s, :error)
       else
         add_flash(_("Credential validation was successful"))
       end
@@ -200,8 +194,8 @@ class StorageManagerController < ApplicationController
       @changed = session[:changed]
       begin
         verify_sm.verify_credentials
-      rescue StandardError => bang
-        add_flash("#{bang}", :error)
+      rescue => bang
+        add_flash(bang.to_s, :error)
       else
         add_flash(_("Credential validation was successful"))
       end
@@ -421,16 +415,16 @@ class StorageManagerController < ApplicationController
     if task == "refresh_inventory"
       begin
         StorageManager.refresh_inventory(sms, true)
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("Error during '%{task}': %{message}") % {:task => task, :message => bang.message},
                   :error)
         AuditEvent.failure(:userid => session[:userid], :event => "storage_manager_#{task}",
           :message => _("Error during '%{task} ': %{message}") % {:task => task, :message => bang.message},
           :target_class => "StorageManager", :target_id => id)
       else
-        add_flash(n_("%{task} initiated for %{count} Storage Manager from the CFME Database",
-                     "%{task} initiated for %{count} Storage Managers from the CFME Database",
-                     sms.length) % {:task => task_name(task), :count => sms.length})
+        add_flash(n_("%{task} initiated for %{count} Storage Manager from the %{product} Database",
+                     "%{task} initiated for %{count} Storage Managers from the %{product} Database",
+                     sms.length) % {:task => task_name(task), :count => sms.length, :product => I18n.t('product.name')})
         AuditEvent.success(:userid => session[:userid], :event => "storage_manager_#{task}",
             :message => _("'%{task}' successfully initiated for %{items}") %
               {:task => task, :items => pluralize(sms.length, "Storage Manager")},
@@ -449,7 +443,7 @@ class StorageManagerController < ApplicationController
         end
         begin
           sm.send(task.to_sym) if sm.respond_to?(task)    # Run the task
-        rescue StandardError => bang
+        rescue => bang
           add_flash(_("%{model} \"%{name}\": Error during '%{task}': %{message}") %
                       {:model   => ui_lookup(:model => "StorageManager"),
                        :name    => sm_name, :task => task,

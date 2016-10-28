@@ -44,7 +44,7 @@ module ManageIQ::Providers::CloudManager::Provision::StateMachine
 
     status_message = "completed; post provision work queued" if clone_status
     message = "Clone of #{clone_direction} is #{status_message}"
-    _log.info("#{message}")
+    _log.info(message)
     update_and_notify_parent(:message => message)
 
     if clone_status
@@ -64,7 +64,7 @@ module ManageIQ::Providers::CloudManager::Provision::StateMachine
 
     if floating_ip
       _log.info("Associating floating IP address [#{floating_ip.address}] to #{for_destination}")
-      associate_floating_ip(floating_ip.address)
+      associate_floating_ip(floating_ip)
     end
 
     signal :post_create_destination

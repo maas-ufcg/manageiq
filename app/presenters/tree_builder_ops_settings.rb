@@ -10,16 +10,14 @@ class TreeBuilderOpsSettings < TreeBuilderOps
 
   def set_locals_for_render
     locals = super
-    locals.merge!(
-      :id_prefix => "settings_",
-      :autoload  => true
-    )
+    locals.merge!(:autoload => true)
   end
 
   def root_options
     region = MiqRegion.my_region
-    title =  _("CFME Region: %{region_description} [%{region}]") % {:region_description => region.description,
-                                                                    :region             => region.region}
+    title =  _("%{product} Region: %{region_description} [%{region}]") % {:region_description => region.description,
+                                                                          :region             => region.region,
+                                                                          :product            => I18n.t('product.name')}
     [title, title, :miq_region]
   end
 
@@ -29,7 +27,7 @@ class TreeBuilderOpsSettings < TreeBuilderOps
       {:id => "sis", :text => _("Analysis Profiles"), :image => "scan_item_set", :tip => _("Analysis Profiles")},
       {:id => "z", :text => _("Zones"), :image => "zone", :tip => _("Zones")}
     ]
-    if get_vmdb_config[:product][:new_ldap]
+    if Settings.product.new_ldap
       objects.push(:id => "l", :text => _("LDAP"), :image => "ldap", :tip => _("LDAP"))
     end
     objects.push(:id => "msc", :text => _("Schedules"), :image => "miq_schedule", :tip => _("Schedules"))
@@ -40,15 +38,10 @@ class TreeBuilderOpsSettings < TreeBuilderOps
   def x_get_tree_custom_kids(object, count_only, _options)
     case object[:id]
     when "l"
-      count_only_or_objects(count_only, LdapRegion.all, "name.to_s")
+      count_only_or_objects(count_only, LdapRegion.all, "name")
     when "msc"
-      objects = []
-      MiqSchedule.where("prod_default != 'system' or prod_default is null").to_a.sort do |a, b|
-        a.name.downcase <=> b.name.downcase
-      end.each do |z|
-        objects.push(z) if z.adhoc.nil?
-      end
-      count_only_or_objects(count_only, objects)
+      objects = MiqSchedule.where("(prod_default != 'system' or prod_default is null) AND adhoc is null")
+      count_only_or_objects(count_only, objects, "name")
     when "sis"
       count_only_or_objects(count_only, ScanItemSet.all, "name")
     when "z"

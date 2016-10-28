@@ -8,8 +8,11 @@ class TreeBuilderTemplateFilter < TreeBuilderVmsFilter
     locals.merge!(
       :tree_id   => "templates_filter_treebox",
       :tree_name => "templates_filter_tree",
-      :id_prefix => "tf_",
       :autoload  => false
     )
+  end
+
+  def root_options
+    [_("All Templates"), _("All of the Templates that I can see")]
   end
 end

@@ -1,7 +1,18 @@
 module VMDB
   module Util
-    def self.http_proxy_uri
-      proxy = VMDB::Config.new("vmdb").config[:http_proxy] || {}
+    def self.http_proxy_uri(proxy_config = :default)
+      # TODO: (julian) This looks really messy. Need to make it look nicer.
+
+      vmdb_proxy = VMDB::Config.new("vmdb").config[:http_proxy]
+
+      return nil unless vmdb_proxy
+
+      if vmdb_proxy[proxy_config].nil?
+        $log.warn("Could not find proxy setting for #{proxy_config}")
+      end
+
+      proxy = vmdb_proxy[proxy_config] || vmdb_proxy
+
       return nil unless proxy[:host]
       proxy = proxy.dup
 
@@ -90,7 +101,7 @@ module VMDB
           return start_time, end_time
         end
       rescue Exception => e
-        _log.error "#{e}"
+        _log.error e.to_s
         return []
       end
     end
@@ -123,8 +134,6 @@ module VMDB
       zfile
     end
 
-    private
-
     # TODO: Make a class out of this so we don't have to pass around the zip.
     def self.add_zip_entry(zip, file_path, zfile)
       entry = zip_entry_from_path(file_path)
@@ -138,6 +147,7 @@ module VMDB
       end
       return entry, mtime
     end
+    private_class_method :add_zip_entry
 
     def self.zip_entry_from_path(path)
       rails_root_directories = Rails.root.to_s.split("/")
@@ -145,6 +155,7 @@ module VMDB
       entry = within_rails_root ? Pathname.new(path).relative_path_from(Rails.root).to_s : "ROOT#{path}"
       entry
     end
+    private_class_method :zip_entry_from_path
 
     def self.find_timestamp(handle)
       handle
@@ -154,5 +165,6 @@ module VMDB
         .reject(&:nil?)
         .first
     end
+    private_class_method :find_timestamp
   end
 end

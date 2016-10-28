@@ -169,6 +169,7 @@ module UiConstants
     :views     => { # List view setting, by resource type
       :authkeypaircloud                         => "list",
       :availabilityzone                         => "list",
+      :hostaggregate                            => "list",
       :catalog                                  => "list",
       :cm_providers                             => "list",
       :cm_configured_systems                    => "list",
@@ -192,6 +193,7 @@ module UiConstants
       :cloudobjectstoreobject                   => "list",
       :cloudtenant                              => "list",
       :cloudvolume                              => "list",
+      :cloudvolumebackup                        => "list",
       :cloudvolumesnapshot                      => "list",
       :drift                                    => "expanded",
       :drift_mode                               => "details",
@@ -209,6 +211,7 @@ module UiConstants
       :manageiq_providers_inframanager_vm       => "grid",
       :manageiq_providers_inframanager_template => "list",
       :manageiq_providers_middlewaremanager     => "grid",
+      :manageiq_providers_storagemanager        => "list",
       :middlewareserver                         => "list",
       :middlewaredeployment                     => "list",
       :middlewaredatasource                     => "list",
@@ -380,7 +383,6 @@ module UiConstants
   NOTHING_STRING = "<<< Nothing >>>"
   SHOWALL_STRING = "<<< Show All >>>"
   MAX_REPORT_COLUMNS = 100      # Default maximum number of columns in a report
-  BAND_UNITS = ["Second", "Minute", "Hour", "Day", "Week", "Month", "Year", "Decade"]
   GRAPH_MAX_COUNT = 10
 
   TREND_MODEL = "VimPerformanceTrend"   # Performance trend model name requiring special processing
@@ -512,6 +514,9 @@ module UiConstants
                                end,
     "vm-tags"               => PostponedTranslation.new(N_("Tagged %{tables}")) do
                                  {:tables => ui_lookup(:tables => "vm")}
+                               end,
+    "container_image-tags"  => PostponedTranslation.new(N_("Tagged %{tables}")) do
+                                 {:tables => ui_lookup(:tables => "container_image")}
                                end,
     "tenant"                => N_("Tenants")
   }

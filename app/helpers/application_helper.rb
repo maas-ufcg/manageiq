@@ -5,7 +5,6 @@ module ApplicationHelper
   include_concern 'PageLayouts'
   include_concern 'FormTags'
   include_concern 'Tasks'
-  include_concern 'AutomateImportExport'
   include Sandbox
   include CompressedIds
   include JsHelper
@@ -319,6 +318,9 @@ module ApplicationHelper
     when "User", "Group", "Patch", "GuestApplication"
       controller = "vm"
       action = @lastaction
+    when "Host" && action == 'x_show'
+      controller = "infra_networking"
+      action = @lastaction
     when "MiqReportResult"
       controller = "report"
       action = "show_saved"
@@ -424,7 +426,6 @@ module ApplicationHelper
                                                                :include_model   => true,
                                                                :include_my_tags => use_mytags,
                                                                :userid          => session[:userid])
-    @exp_available_tags
   end
 
   # Replacing calls to VMDB::Config.new in the views/controllers
@@ -579,33 +580,9 @@ module ApplicationHelper
     javascript_for_miq_button_visibility(changed)
   end
 
-  # Highlight tree nodes that have been changed
-  def javascript_for_tree_checkbox_clicked(tree_name)
-    tree_name_escaped = j_str(tree_name)
-    js_array = []
-    if params[:check] # Tree checkbox clicked?
-      # MyCompany tag checked or Belongsto checked
-      key = params[:tree_typ] == 'myco' ? :filters : :belongsto
-      future  = @edit[:new][key][params[:id].split('___').last]
-      current = @edit[:current][key][params[:id].split('___').last]
-      title_class = params[:tree_typ] == "vat" || params[:tree_typ] == "hac" ? 'cfme-no-cursor-node' : 'dynatree-title'
-      css_class = future == current ? title_class : 'cfme-blue-bold-node'
-      js_array << "$('##{tree_name_escaped}box').dynatree('getTree').getNodeByKey('#{params[:id].split('___').last}').data.addClass = '#{css_class}';"
-    end
-    # need to redraw the tree to change node colors
-    js_array << "tree = $('##{tree_name_escaped}box').dynatree('getTree');"
-    js_array << "tree.redraw();"
-    js_array.join("\n")
-  end
-
   def javascript_pf_toolbar_reload(div_id, toolbar)
     "sendDataWithRx({redrawToolbar: #{toolbar_from_hash.to_json}});"
   end
-
-  def javascript_for_ae_node_selection(id, prev_id, select)
-    "miqSetAETreeNodeSelectionClass('#{id}', '#{prev_id}', '#{select ? true : false}');".html_safe
-  end
-  ############# End of methods that generate JS lines for render page blocks
 
   def set_edit_timer_from_schedule(schedule)
     @edit[:new][:timer] ||= ReportHelper::Timer.new
@@ -648,7 +625,7 @@ module ApplicationHelper
     if @show_taskbar.nil?
       @show_taskbar = false
       if ! (@layout == "" && %w(auth_error change_tab show).include?(controller.action_name) ||
-        %w(about chargeback exception miq_ae_automate_button miq_ae_class miq_ae_export
+        %w(about chargeback ems_infra_dashboard exception miq_ae_automate_button miq_ae_class miq_ae_export
            miq_ae_tools miq_capacity_bottlenecks miq_capacity_planning miq_capacity_utilization
            miq_capacity_waste miq_policy miq_policy_export miq_policy_rsop ops pxe report rss
            server_build middleware_topology network_topology container_dashboard).include?(@layout) ||
@@ -712,7 +689,7 @@ module ApplicationHelper
   ]
   # Return a blank tb if a placeholder is needed for AJAX explorer screens, return nil if no custom toolbar to be shown
   def custom_toolbar_filename
-    if %w(ems_cloud ems_cluster ems_infra host miq_template storage ems_network cloud_tenant).include?(@layout) # Classic CIs
+    if %w(ems_cloud ems_cluster ems_infra host miq_template storage ems_storage ems_network cloud_tenant).include?(@layout) # Classic CIs
       return "custom_buttons_tb" if @record && @lastaction == "show" && @display == "main"
     end
 
@@ -810,16 +787,19 @@ module ApplicationHelper
   end
 
   def display_adv_search?
-    %w(availability_zone cloud_volume container_group container_node container_service
+    %w(auth_key_pair_cloud availability_zone host_aggregate cloud_object_store_container
+       cloud_tenant cloud_volume container_group container_node container_service
        container_route container_project container_replicator container_image
        container_image_registry persistent_volume container_build
        ems_container vm miq_template offline retired templates
-       host service storage ems_cloud ems_cluster flavor
+       ems_middleware middleware_server middleware_domain middleware_messaging middleware_deployment
+       middleware_datasource host service storage ems_cloud ems_cluster flavor
        ems_network security_group floating_ip cloud_subnet network_router network_port cloud_network
        load_balancer
+       ems_storage cloud_volume cloud_object_store_container
        resource_pool ems_infra ontap_storage_system ontap_storage_volume
        ontap_file_share snia_local_file_system ontap_logical_disk
-       orchestration_stack cim_base_storage_extent storage storage_manager configuration_job).include?(@layout)
+       orchestration_stack cim_base_storage_extent storage_manager configuration_job).include?(@layout)
   end
 
   # Do we show or hide the clear_search link in the list view title
@@ -854,7 +834,7 @@ module ApplicationHelper
   end
 
   def pressed2model_action(pressed)
-    pressed =~ /^(ems_cluster|miq_template)_(.*)$/ ? [$1, $2] : pressed.split('_', 2)
+    pressed =~ /^(ems_cluster|miq_template|infra_networking)_(.*)$/ ? [$1, $2] : pressed.split('_', 2)
   end
 
   def model_for_ems(record)
@@ -1031,7 +1011,7 @@ module ApplicationHelper
     test_layout = @layout
     # FIXME: exception behavior to remove
     test_layout = 'my_tasks' if %w(my_tasks my_ui_tasks all_tasks all_ui_tasks).include?(@layout)
-    test_layout = 'cloud_volume' if @layout == 'cloud_volume_snapshot'
+    test_layout = 'cloud_volume' if @layout == 'cloud_volume_snapshot' || @layout == 'cloud_volume_backup'
     test_layout = 'cloud_object_store_container' if @layout == 'cloud_object_store_object'
 
     Menu::Manager.item_in_section?(test_layout, nav_id) ? 'active' : nil
@@ -1070,10 +1050,23 @@ module ApplicationHelper
     end
   end
 
-  def javascript_flash
-    render :json => ExplorerPresenter.flash.replace(
-      'flash_msg_div',
-      render_to_string(:partial => "layouts/flash_msg")).for_render
+  def javascript_flash(**args)
+    add_flash(args[:text], args[:severity]) if args[:text].present?
+
+    ex = ExplorerPresenter.flash.replace('flash_msg_div',
+                                         render_to_string(:partial => "layouts/flash_msg"))
+    ex.scroll_top if args[:scroll_top]
+    ex.spinner_off if args[:spinner_off]
+    ex.focus(args[:focus]) if args[:focus]
+    ex.activate_tree_node(args[:activate_node]) if args[:activate_node]
+
+    render :json => ex.for_render
+  end
+
+  def javascript_open_window(url)
+    ex = ExplorerPresenter.open_window(url)
+    ex.spinner_off
+    render :json => ex.for_render
   end
 
   # this keeps the main_div wrapping tag, replaces only the inside
@@ -1117,14 +1110,14 @@ module ApplicationHelper
     "#{@options[:page_size] || "US-Legal"} #{@options[:page_layout]}"
   end
 
-  GTL_VIEW_LAYOUTS = %w(action availability_zone auth_key_pair_cloud
-                        cim_base_storage_extent cloud_object_store_container
-                        cloud_object_store_object cloud_tenant cloud_volume cloud_volume_snapshot
+  GTL_VIEW_LAYOUTS = %w(action availability_zone host_aggregate auth_key_pair_cloud
+                        cim_base_storage_extent ems_storage cloud_object_store_container
+                        cloud_object_store_object cloud_tenant cloud_volume cloud_volume_backup cloud_volume_snapshot
                         configuration_job condition container_group container_route container_project
                         container_replicator container_image container_image_registry
-                        container_topology container_dashboard middleware_topology persistent_volume container_build
-                        container_node container_service ems_cloud ems_cluster ems_container ems_infra event
-                        ems_middleware middleware_server middleware_deployment middleware_datasource
+                        container_topology container_dashboard ems_infra_dashboard middleware_topology persistent_volume
+                        container_build container_node container_service ems_cloud ems_cluster ems_container ems_infra
+                        event ems_middleware middleware_server middleware_deployment middleware_datasource
                         middleware_domain middleware_server_group middleware_messaging
                         ems_network security_group floating_ip cloud_subnet network_router network_topology network_port cloud_network
                         load_balancer
@@ -1165,13 +1158,14 @@ module ApplicationHelper
 
   def render_listnav_filename
     if @lastaction == "show_list" && !session[:menu_click] &&
-      %w(auth_key_pair_cloud cloud_object_store_container cloud_object_store_object cloud_volume cloud_volume_snapshot
-         container_node container_service ems_container container_group ems_cloud ems_cluster container_route
-         container_project container_replicator container_image container_image_registry container_build
-         ems_infra host miq_template offline orchestration_stack persistent_volume ems_middleware
-         middleware_server middleware_deployment middleware_datasource middleware_domain middleware_server_group
-         middleware_messaging ems_network security_group floating_ip cloud_subnet network_router network_port
-         cloud_network resource_pool retired service templates vm configuration_job).include?(@layout) && !@in_a_form
+       %w(auth_key_pair_cloud availability_zone cloud_object_store_container cloud_object_store_object cloud_tenant
+          cloud_volume cloud_volume_backup cloud_volume_snapshot container_node container_service ems_container container_group
+          ems_cloud ems_cluster container_route container_project container_replicator container_image container_image_registry
+          container_build ems_infra flavor host miq_template offline orchestration_stack persistent_volume
+          ems_middleware middleware_server middleware_deployment middleware_datasource middleware_domain
+          middleware_server_group middleware_messaging ems_network security_group floating_ip cloud_subnet
+          network_router network_port cloud_network resource_pool retired service storage templates vm ems_storage
+          configuration_job).include?(@layout) && !@in_a_form
       "show_list"
     elsif @compare
       "compare_sections"
@@ -1179,14 +1173,14 @@ module ApplicationHelper
       "explorer"
     elsif %w(offline retired templates vm vm_cloud vm_or_template).include?(@layout)
       "vm"
-    elsif %w(action auth_key_pair_cloud availability_zone cim_base_storage_extent cloud_object_store_container
-             cloud_object_store_object cloud_tenant cloud_volume cloud_volume_snapshot condition container_group
-             container_route container_project container_replicator container_image container_image_registry
+    elsif %w(action auth_key_pair_cloud availability_zone host_aggregate cim_base_storage_extent cloud_object_store_container
+             cloud_object_store_object cloud_tenant cloud_volume cloud_volume_backup cloud_volume_snapshot condition
+             container_group container_route container_project container_replicator container_image container_image_registry
              container_build container_node container_service persistent_volume ems_cloud ems_container ems_cluster ems_infra
              ems_middleware middleware_server middleware_deployment middleware_datasource middleware_domain
              middleware_messaging middleware_server_group flavor
              ems_network security_group floating_ip cloud_subnet network_router network_port cloud_network
-             load_balancer
+             load_balancer ems_storage
              host miq_schedule miq_template policy ontap_file_share ontap_logical_disk
              ontap_storage_system ontap_storage_volume orchestration_stack resource_pool configuration_job
              scan_profile service snia_local_file_system storage_manager timeline).include?(@layout)
@@ -1195,13 +1189,15 @@ module ApplicationHelper
   end
 
   def show_adv_search?
-    show_search = %w(availability_zone cim_base_storage_extent cloud_volume cloud_volume_snapshot container_group container_node container_service
-                     container_route container_project container_replicator container_image container_image_registry
-                     persistent_volume container_build
-                     ems_cloud ems_cluster ems_container ems_infra flavor host miq_template offline
-                     ontap_file_share ontap_logical_disk ontap_storage_system ontap_storage_volume
+    show_search = %w(auth_key_pair_cloud availability_zone host_aggregate cim_base_storage_extent
+                     cloud_object_store_container cloud_tenant cloud_volume cloud_volume_backup cloud_volume_snapshot
+                     container_group container_node container_service container_route container_project container_replicator
+                     container_image container_image_registry persistent_volume container_build ems_middleware
+                     middleware_server middleware_domain middleware_messaging middleware_deployment
+                     middleware_datasource ems_cloud ems_cluster ems_container ems_infra flavor host miq_template
+                     offline ontap_file_share ontap_logical_disk ontap_storage_system ontap_storage_volume
                      ems_network security_group floating_ip cloud_subnet network_router network_port cloud_network
-                     load_balancer
+                     ems_storage load_balancer
                      orchestration_stack resource_pool retired service configuration_job
                      snia_local_file_system storage_manager templates vm)
     (@lastaction == "show_list" && !session[:menu_click] && show_search.include?(@layout) && !@in_a_form) ||
@@ -1224,13 +1220,26 @@ module ApplicationHelper
   end
 
   def x_gtl_view_tb_render?
-    no_gtl_view_buttons = %w(chargeback miq_ae_class miq_ae_customization miq_ae_tools miq_capacity_planning
-                             miq_capacity_utilization miq_policy miq_policy_rsop report ops provider_foreman pxe)
+    no_gtl_view_buttons = %w(
+      chargeback
+      generic_object_definition
+      miq_ae_class
+      miq_ae_customization
+      miq_ae_tools
+      miq_capacity_planning
+      miq_capacity_utilization
+      miq_policy
+      miq_policy_rsop
+      ops
+      provider_foreman
+      pxe
+      report
+    )
     @record.nil? && @explorer && !no_gtl_view_buttons.include?(@layout)
   end
 
   def explorer_controller?
-    %w(vm_cloud vm_infra vm_or_template).include?(controller_name)
+    %w(vm_cloud vm_infra vm_or_template infra_networking).include?(controller_name)
   end
 
   def vm_quad_link_attributes(record)

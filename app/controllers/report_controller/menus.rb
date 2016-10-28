@@ -20,9 +20,9 @@ module ReportController::Menus
     menu_set_form_vars if ["explorer", "tree_select", "x_history"].include?(params[:action])
     @in_a_form = true
     if @menu_lastaction != "menu_editor"
-      @menu_roles_tree = build_menu_tree(@edit[:new])
+      @menu_roles_tree = TreeBuilder.convert_bs_tree(build_menu_tree(@edit[:new])).to_json
     else
-      @menu_roles_tree = build_menu_tree(@rpt_menu) # changing rpt_menu if changes have been commited to show updated tree with changes
+      @menu_roles_tree = TreeBuilder.convert_bs_tree(build_menu_tree(@rpt_menu)).to_json # changing rpt_menu if changes have been commited to show updated tree with changes
     end
     @sb[:role_list_flag] = true if params[:id]
 
@@ -45,13 +45,12 @@ module ReportController::Menus
   end
 
   def menu_folder_message_display
-    params[:typ] == "delete" ?
-      add_flash(_("Can not delete folder, one or more reports in the selected folder are not owned by your group"), :warning) :
-      add_flash(_("Double Click on 'New Folder' to edit"), :warning)
-    render :update do |page|
-      page << javascript_prologue
-      page.replace("flash_msg_div_menu_list", :partial => "layouts/flash_msg", :locals => {:div_num => "_menu_list"})
-    end
+    text = if params[:typ] == "delete"
+             _("Can not delete folder, one or more reports in the selected folder are not owned by your group")
+           else
+             _("Double Click on 'New Folder' to edit")
+           end
+    render_flash(text, :warning)
   end
 
   # AJAX driven routine to check for changes in ANY field on the user form
@@ -209,7 +208,7 @@ module ReportController::Menus
       get_tree_data
       replace_right_cell(:menu_edit_action => "menu_reset")
     elsif params[:button] == "default"
-      @menu_roles_tree = build_report_listnav("reports", "menu", "default")
+      @menu_roles_tree = TreeBuilder.convert_bs_tree(build_report_listnav("reports", "menu", "default")).to_json
       @edit[:new]               = copy_array(@rpt_menu)
       @menu_lastaction          = "default"
       add_flash(_("Report Menu set to default"), :warning)
@@ -417,7 +416,7 @@ module ReportController::Menus
       end
     end
     base_node[:children] = @tree
-    menu_roles_tree = base_node.to_json unless base_node.nil? || base_node.empty?
+    menu_roles_tree = base_node unless base_node.nil? || base_node.empty?
     menu_roles_tree
   end
 

@@ -16,9 +16,21 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager do
         :ems_kubernetes,
         :hostname        => 'hostname',
         :authentications => [
-          FactoryGirl.build(:authentication, :authtype => 'bearer', :auth_key => 'valid-token')
+          FactoryGirl.build(:authentication, :authtype => 'bearer', :auth_key => 'valid-token'),
+          FactoryGirl.build(:authentication, :authtype => 'hawkular')
         ]
       )
+      allow(@ems).to receive_message_chain(:connect, :proxy_url => "Hello")
+      allow(@ems).to receive_message_chain(:connect, :headers   => { "Authorization" => "Bearer valid-token" })
+    end
+
+    it "checks for the right credential fields" do
+      expect(@ems.required_credential_fields(:bearer)).to eq([:auth_key])
+    end
+
+    it "checks for missing_credentials" do
+      expect(@ems.missing_credentials?(:bearer)).to be_falsey
+      expect(@ems.missing_credentials?(:hawkular)).to be_truthy
     end
 
     it ".scan_entity_create" do
@@ -37,7 +49,7 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager do
 
     it ".scan_job_create" do
       image = FactoryGirl.create(:container_image, :ext_management_system => @ems)
-      job = @ems.scan_job_create(image.class.name, image.id)
+      job = @ems.raw_scan_job_create(image)
 
       expect(job.state).to eq("waiting_to_start")
       expect(job.status).to eq("ok")

@@ -84,24 +84,17 @@ module ReportController::Reports
     rpt = MiqReport.find(params[:id])
 
     if rpt.miq_widgets.exists?
-      add_flash(_("Report cannot be deleted if it's being used by one or more Widgets"), :error)
-      render :update do |page|
-        page << javascript_prologue
-        page.replace("flash_msg_div_report_list", :partial => "layouts/flash_msg", :locals => {:div_num => "_report_list"})
-      end
+      render_flash(_("Report cannot be deleted if it's being used by one or more Widgets"), :error)
     else
       begin
         raise StandardError, "Default %{model} \"%{name}\" cannot be deleted" % {:model => ui_lookup(:model => "MiqReport"), :name => rpt.name} if rpt.rpt_type == "Default"
         rpt_name = rpt.name
         audit = {:event => "report_record_delete", :message => "[#{rpt_name}] Record deleted", :target_id => rpt.id, :target_class => "MiqReport", :userid => session[:userid]}
         rpt.destroy
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("%{model} \"%{name}\": Error during 'miq_report_delete': %{message}") %
                     {:model => ui_lookup(:model => "MiqReport"), :name => rpt_name, :message =>  bang.message}, :error)
-        render :update do |page|
-          page << javascript_prologue
-          page.replace("flash_msg_div_report_list", :partial => "layouts/flash_msg", :locals => {:div_num => "_report_list"})
-        end
+        javascript_flash
         return
       else
         AuditEvent.success(audit)
@@ -128,18 +121,19 @@ module ReportController::Reports
   end
 
   def sample_timeline
-    tl_xml = MiqXml.load("<data/>")
-    tl_event(tl_xml, format_timezone(Time.now, "UTC", nil), "Now", "red")
-    tl_event(tl_xml, format_timezone(Time.now - 5.seconds, "UTC", nil), "5 Seconds Ago")
-    tl_event(tl_xml, format_timezone(Time.now - 1.minute, "UTC", nil), "1 Minute Ago")
-    tl_event(tl_xml, format_timezone(Time.now - 5.minutes, "UTC", nil), "5 Minutes Ago")
-    tl_event(tl_xml, format_timezone(Time.now - 1.hour, "UTC", nil), "1 Hour Ago")
-    tl_event(tl_xml, format_timezone(Time.now - 1.day, "UTC", nil), "Yesterday")
-    tl_event(tl_xml, format_timezone(Time.now - 1.week, "UTC", nil), "Last Week")
-    tl_event(tl_xml, format_timezone(Time.now - 1.month, "UTC", nil), "Last Month")
-    tl_event(tl_xml, format_timezone(Time.now - 3.months, "UTC", nil), "3 Months Ago")
-    tl_event(tl_xml, format_timezone(Time.now - 1.year, "UTC", nil), "Last Year")
-    render :xml => tl_xml.to_s
+    @events_data = []
+    time = Time.zone.now
+    @events_data.push(tl_event(format_timezone(time, "UTC", nil), "Now", "red"))
+    @events_data.push(tl_event(format_timezone(time - 5.seconds, "UTC", nil), "5 Seconds Ago"))
+    @events_data.push(tl_event(format_timezone(time - 1.minute, "UTC", nil), "1 Minute Ago"))
+    @events_data.push(tl_event(format_timezone(time - 5.minutes, "UTC", nil), "5 Minutes Ago"))
+    @events_data.push(tl_event(format_timezone(time - 1.hour, "UTC", nil), "1 Hour Ago"))
+    @events_data.push(tl_event(format_timezone(time - 1.day, "UTC", nil), "Yesterday"))
+    @events_data.push(tl_event(format_timezone(time - 1.week, "UTC", nil), "Last Week"))
+    @events_data.push(tl_event(format_timezone(time - 1.month, "UTC", nil), "Last Month"))
+    @events_data.push(tl_event(format_timezone(time - 3.months, "UTC", nil), "3 Months Ago"))
+    @events_data.push(tl_event(format_timezone(time - 1.year, "UTC", nil), "Last Year"))
+    [{:data => [@events_data]}].to_json
   end
 
   def preview_timeline
@@ -203,19 +197,13 @@ module ReportController::Reports
 
   private
 
-  def tl_event(tl, tl_time, tl_text, tl_color = nil)
-    event = tl.root.add_element("event",
-                                "start" => tl_time,
-                                #                                       "end" => Time.now,
-                                #                                       "isDuration" => "true",
-                                "title" => tl_text,
-                                #         "icon"=>"/images/16/16-event-vm_snapshot.png",
-                                "icon"  => ActionController::Base.helpers.image_path("16/blue-circle.png"),
-                                #         "image"=>"/images/64/64-snapshot.png",
-                                "color" => tl_color
-                               # "image"=>"/images/64/64-vendor-#{vm.vendor.downcase}.png"
-                               )
-    event.text = tl_text
+  def tl_event(tl_time, tl_text, tl_color = nil)
+    {"start"       => tl_time,
+     "title"       => tl_text,
+     "description" => tl_text,
+     "icon"        => ActionController::Base.helpers.image_path("16/blue-circle.png"),
+     "color"       => tl_color
+    }
   end
 
   def menu_repname_update(old_name, new_name)

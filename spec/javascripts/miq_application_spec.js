@@ -439,4 +439,36 @@ describe('miq_application.js', function() {
     });
   });
 
+  describe('miqUncompressedId', function () {
+    it('returns uncompressed id unchanged', function() {
+      expect(miqUncompressedId('123')).toEqual('123');
+      expect(miqUncompressedId('12345678901234567890')).toEqual('12345678901234567890');
+    });
+
+    it('uncompresses compressed id', function() {
+      expect(miqUncompressedId('1r23')).toEqual('1000000000023');
+      expect(miqUncompressedId('999r123456789012')).toEqual('999123456789012');
+    });
+  });
+
+  describe('miqFormatNotification', function () {
+    context('single placeholder', function () {
+      it('replaces placeholders with bindings', function () {
+        expect(miqFormatNotification('¯\_%{dude}_/¯', {dude: { text: '(ツ)' }})).toEqual('¯\_(ツ)_/¯');
+      });
+    });
+
+    context('multiple placeholders', function () {
+      it('replaces placeholders with bindings', function () {
+        expect(miqFormatNotification('%{dude}︵ %{table}', {dude: { text: '(╯°□°）╯' }, table: {text: '┻━┻'}})).toEqual('(╯°□°）╯︵ ┻━┻');
+      });
+    });
+
+    context('same placeholder multiple times', function () {
+      it('replaces placeholders with bindings', function () {
+        expect(miqFormatNotification('( %{eye}▽%{eye})/', {eye: { text: 'ﾟ' }})).toEqual('( ﾟ▽ﾟ)/');
+      });
+    });
+  });
 });
+

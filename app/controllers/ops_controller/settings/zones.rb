@@ -22,10 +22,7 @@ module OpsController::Settings::Zones
         add_flash(_("Description is required"), :error)
       end
       if @flash_array
-        render :update do |page|
-          page << javascript_prologue
-          page.replace(:flash_msg_div, :partial => "layouts/flash_msg")
-        end
+        javascript_flash(:spinner_off => true)
         return
       end
       # zone = @zone.id.blank? ? Zone.new : Zone.find(@zone.id)  # Get new or existing record
@@ -64,8 +61,8 @@ module OpsController::Settings::Zones
     zonename = zone.name
     begin
       zone.destroy
-    rescue StandardError => bang
-      add_flash("#{bang}", :error)
+    rescue => bang
+      add_flash(bang.to_s, :error)
       zone.errors.each { |field, msg| add_flash("#{field.to_s.capitalize} #{msg}", :error) }
       self.x_node = "z-#{zone.id}"
       get_node_info(x_node)

@@ -6,21 +6,22 @@ module Api
     AUTH_TYPE_ATTR    = "auth_type"
     DEFAULT_AUTH_TYPE = "default"
     CONNECTION_ATTRS  = %w(connection_configurations).freeze
-    ENDPOINT_ATTRS    = %w(hostname ipaddress port security_protocol).freeze
+    ENDPOINT_ATTRS    = %w(hostname url ipaddress port security_protocol).freeze
     RESTRICTED_ATTRS  = [TYPE_ATTR, CREDENTIALS_ATTR, ZONE_ATTR, "zone_id"]
 
     include Subcollections::Policies
     include Subcollections::PolicyProfiles
     include Subcollections::Tags
     include Subcollections::CloudNetworks
+    include Subcollections::CustomAttributes
 
-    def create_resource_providers(type, _id, data = {})
+    def create_resource(type, _id, data = {})
       assert_id_not_specified(data, type)
 
       create_provider(data)
     end
 
-    def edit_resource_providers(type, id = nil, data = {})
+    def edit_resource(type, id = nil, data = {})
       raise BadRequestError, "Must specify an id for editing a #{type} resource" unless id
       raise BadRequestError, "Provider type cannot be updated" if data.key?(TYPE_ATTR)
 
@@ -28,7 +29,7 @@ module Api
       edit_provider(provider, data)
     end
 
-    def refresh_resource_providers(type, id = nil, _data = nil)
+    def refresh_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for refreshing a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -39,7 +40,7 @@ module Api
       end
     end
 
-    def delete_resource_providers(type, id = nil, _data = nil)
+    def delete_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for deleting a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -50,7 +51,27 @@ module Api
       end
     end
 
+    def custom_attributes_edit_resource(object, type, id, data = nil)
+      formatted_data = format_provider_custom_attributes(data)
+      super(object, type, id, formatted_data)
+    end
+
+    def custom_attributes_add_resource(object, type, id, data = nil)
+      formatted_data = format_provider_custom_attributes(data)
+      super(object, type, id, formatted_data)
+    end
+
     private
+
+    def format_provider_custom_attributes(attribute)
+      if CustomAttribute::ALLOWED_API_VALUE_TYPES.include? attribute["field_type"]
+        attribute["value"] = attribute.delete("field_type").safe_constantize.parse(attribute["value"])
+      end
+      attribute["section"] = "metadata" unless @req.action == "edit"
+      attribute
+    rescue => err
+      raise BadRequestError, "Invalid provider custom attributes specified - #{err}"
+    end
 
     def provider_ident(provider)
       "Provider id:#{provider.id} name:'#{provider.name}'"

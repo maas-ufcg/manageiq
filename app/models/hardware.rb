@@ -1,4 +1,5 @@
 class Hardware < ApplicationRecord
+  include VirtualTotalMixin
   belongs_to  :vm_or_template
   belongs_to  :vm,            :foreign_key => :vm_or_template_id
   belongs_to  :miq_template,  :foreign_key => :vm_or_template_id
@@ -25,8 +26,8 @@ class Hardware < ApplicationRecord
   virtual_column :ipaddresses,   :type => :string_set, :uses => :networks
   virtual_column :hostnames,     :type => :string_set, :uses => :networks
   virtual_column :mac_addresses, :type => :string_set, :uses => :nics
-  virtual_attribute :used_disk_storage,      :integer, :uses => :disks
-  virtual_attribute :allocated_disk_storage, :integer, :uses => :disks
+  virtual_aggregate :used_disk_storage,      :disks, :sum, :used_disk_storage
+  virtual_aggregate :allocated_disk_storage, :disks, :sum, :size
 
   def ipaddresses
     @ipaddresses ||= networks.collect(&:ipaddress).compact.uniq
@@ -70,7 +71,7 @@ class Hardware < ApplicationRecord
       begin
         parent.hardware.send("m_#{e.name}", parent, e, deletes) if parent.hardware.respond_to?("m_#{e.name}")
       rescue => err
-        _log.warn "#{err}"
+        _log.warn err.to_s
       end
     end
 
@@ -118,19 +119,23 @@ class Hardware < ApplicationRecord
       t[:disk_capacity]) * -100 + 100)
   end)
 
-  def allocated_disk_storage
-    if disks.loaded?
-      disks.blank? ? nil : disks.inject(0) { |t, d| t + d.size.to_i }
-    else
-      disks.sum('coalesce(size, 0)')
+  def connect_lans(lans)
+    return if lans.blank?
+    nics.each do |n|
+      # TODO: Use a different field here
+      #   model is temporarily being used here to transfer the name of the
+      #   lan to which this nic is connected.  If model ends up being an
+      #   otherwise used field, this will need to change
+      n.lan = lans.find { |l| l.name == n.model }
+      n.model = nil
+      n.save
     end
   end
 
-  def used_disk_storage
-    if disks.loaded?
-      disks.blank? ? nil : disks.inject(0) { |t, d| t + (d.size_on_disk || d.size).to_i }
-    else
-      disks.sum('coalesce(size_on_disk, size, 0)')
+  def disconnect_lans
+    nics.each do |n|
+      n.lan = nil
+      n.save
     end
   end
 

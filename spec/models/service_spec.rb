@@ -131,16 +131,39 @@ describe Service do
       expect(@service.group_has_resources?(0)).to be_falsey
     end
 
+    it "last_index" do
+      @service.add_resource(Vm.first, :group_idx => 1, :start_delay => 60)
+      expect(@service.last_index).to eq 1
+    end
+
     it "start" do
+      @service.add_resource(Vm.first, :group_idx => 0, :start_delay => 60)
       expect(MiqEvent).to receive(:raise_evm_event).with(@service, :request_service_start)
+      expect(@service).to receive(:queue_group_action).with(:start, 0, 1, 60)
 
       @service.start
     end
 
     it "stop" do
+      @service.add_resource(Vm.first, :group_idx => 1, :stop_delay => 60)
       expect(MiqEvent).to receive(:raise_evm_event).with(@service, :request_service_stop)
+      expect(@service).to receive(:queue_group_action).with(:stop, 1, -1, 60)
 
       @service.stop
+    end
+
+    it "suspend" do
+      @service.add_resource(Vm.first, :group_idx => 1, :stop_delay => 60)
+      expect(@service).to receive(:queue_group_action).with(:suspend, 1, -1, 60)
+
+      @service.suspend
+    end
+
+    it "shutdown_guest" do
+      @service.add_resource(Vm.first, :group_idx => 1, :stop_delay => 60)
+      expect(@service).to receive(:queue_group_action).with(:shutdown_guest, 1, -1, 60)
+
+      @service.shutdown_guest
     end
 
     context "with VM resources" do
@@ -218,7 +241,6 @@ describe Service do
         expect(@service.next_group_index(0, -1)).to be_nil
       end
 
-
       it "should not allow the same VM to be added to more than one services" do
         vm = Vm.first
         @service.save
@@ -237,6 +259,82 @@ describe Service do
 
         @service.reload
         expect(@service.vms.length).to eq(1)
+      end
+    end
+  end
+
+  context "Chargeback report generation" do
+    before do
+      @vm = FactoryGirl.create(:vm_vmware)
+      @vm_1 = FactoryGirl.create(:vm_vmware)
+
+      @service = FactoryGirl.create(:service)
+      @service.name = "Test_Service_1"
+      @service_c1 = FactoryGirl.create(:service, :service => @service)
+      @service_c1.name = "Test_Service_2"
+      @service << @vm
+      @service_c1 << @vm_1
+      @service.save
+      @service_c1.save
+    end
+
+    describe ".queue_chargeback_reports" do
+      it "queue request to generate chargeback report for each service" do
+        expect(MiqQueue).to receive(:put).twice
+        described_class.queue_chargeback_reports
+      end
+    end
+
+    describe "#chargeback_report_name" do
+      it "creates chargeback report's name" do
+        expect(@service.chargeback_report_name).to eq "Chargeback-Vm-Monthly-Test_Service_1"
+        expect(@service_c1.chargeback_report_name).to eq "Chargeback-Vm-Monthly-Test_Service_2"
+      end
+    end
+
+    describe "#queue_chargeback_report_generation" do
+      it "queue request to generate chargeback report" do
+        expect(MiqQueue).to receive(:put) do |args|
+          expect(args).to have_attributes(:class_name  => described_class.name,
+                                          :method_name => "generate_chargeback_report",
+                                          :args        => {:report_source => "Test Run"})
+        end
+        @service.queue_chargeback_report_generation(:report_source => "Test Run")
+      end
+    end
+
+    describe "#generate_chargeback_report" do
+      it "delete existing chargeback report result for service before generating new one" do
+        FactoryGirl.create(:miq_chargeback_report_result, :name => @service.chargeback_report_name)
+        expect(MiqReportResult.count).to eq 1
+
+        report = double("MiqReport")
+        allow(MiqReport).to receive(:new).and_return(report)
+        expect(report).to receive(:queue_generate_table)
+
+        @service.generate_chargeback_report
+        expect(MiqReportResult.count).to eq 0
+      end
+
+      it "loads report template and initiate generation" do
+        EvmSpecHelper.local_miq_server
+        @service.generate_chargeback_report
+        expect(MiqReportResult.count).to eq 1
+        expect(MiqReportResult.first.name).to eq @service.chargeback_report_name
+      end
+    end
+
+    describe "#chargeback_yaml" do
+      it "loads chargeback report template" do
+        @user = FactoryGirl.create(:user_with_group)
+        report_yaml = @service.chargeback_yaml
+
+        report = MiqReport.new(report_yaml)
+        allow(Chargeback).to receive(:build_results_for_report_chargeback)
+        report.generate_table(:userid => @user.userid)
+        cols_from_data = report.table.column_names.to_set
+        cols_from_yaml = report_yaml['col_order'].to_set
+        expect(cols_from_yaml).to be_subset(cols_from_data)
       end
     end
   end
@@ -344,6 +442,50 @@ describe Service do
       service_c1 = FactoryGirl.create(:service, :service => service)
       expect(service_c1.root).to eq(service)
       expect(service_c1.root_service).to eq(service) # alias
+    end
+  end
+
+  describe "#service_action" do
+    let(:service) { FactoryGirl.create(:service) }
+    let(:service_resource_nil) { double(:service_resource) }
+    let(:service_resource_power) do
+      instance_double("ServiceResource", :start_action => "Power On",
+                                         :stop_action  => "Suspend")
+    end
+    let(:service_resource_power_off) { instance_double("ServiceResource", :stop_action => "Power Off") }
+    let(:service_resource_shutdown) { instance_double("ServiceResource", :stop_action => "Shutdown") }
+    let(:service_resource_nothing) do
+      instance_double("ServiceResource", :start_action => "Do Nothing",
+                                         :stop_action  => "Do Nothing")
+    end
+
+    context "service_resource start_action stop_action is nil" do
+      it "returns the original action" do
+        expect(service.service_action(:start, service_resource_nil)).to eq(:start)
+        expect(service.service_action(:suspend, service_resource_nil)).to eq(:suspend)
+        expect(service.service_action(:stop, service_resource_nil)).to eq(:stop)
+        expect(service.service_action(nil, service_resource_nil)).to eq(nil)
+      end
+    end
+
+    context "service_resource start_action stop_action is not nil" do
+      it "returns :start for 'Power On'" do
+        expect(service.service_action(:start, service_resource_power)).to eq(:start)
+      end
+
+      it "returns :stop for Power Off" do
+        expect(service.service_action(:stop, service_resource_power_off)).to eq(:stop)
+      end
+
+      it "returns :shutdown_guest for Shutdown" do
+        expect(service.service_action(:stop, service_resource_power_off)).to eq(:stop)
+        expect(service.service_action(:stop, service_resource_shutdown)).to eq(:shutdown_guest)
+      end
+
+      it "returns nil for Do Nothing" do
+        expect(service.service_action(:stop, service_resource_nothing)).to be_nil
+        expect(service.service_action(:start, service_resource_nothing)).to be_nil
+      end
     end
   end
 

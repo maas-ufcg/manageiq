@@ -24,12 +24,7 @@ class ServiceController < ApplicationController
       SERVICE_X_BUTTON_ALLOWED_ACTIONS.key?(action)
 
     send_action = SERVICE_X_BUTTON_ALLOWED_ACTIONS[action]
-
-    if [:service_ownership, :service_tag].include?(send_action)
-      send(send_action, 'Service')
-    else
-      send(send_action)
-    end
+    send(send_action)
     send_action
   end
   private :whitelisted_action
@@ -141,7 +136,7 @@ class ServiceController < ApplicationController
 
       begin
         service.save
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("Error during 'Service Edit': %{message}") % {:message => bang.message}, :error)
       else
         add_flash(_("Service \"%{name}\" was saved") % {:name => service.name})

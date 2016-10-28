@@ -26,6 +26,7 @@ class ExtManagementSystem < ApplicationRecord
   end
 
   belongs_to :provider
+  include CustomAttributeMixin
   belongs_to :tenant
   has_many :container_deployments, :foreign_key => :deployed_on_ems_id, :inverse_of => :deployed_on_ems
   has_many :endpoints, :as => :resource, :dependent => :destroy, :autosave => true
@@ -309,7 +310,9 @@ class ExtManagementSystem < ApplicationRecord
       connection.delete(:authentication)
     else
       unless connection[:authentication].key?(:role)
-        connection[:authentication][:role] ||= "default"
+        endpoint_role = connection[:endpoint][:role]
+        authentication_role = endpoint_role == "default" ? default_authentication_type.to_s : endpoint_role
+        connection[:authentication][:role] ||= authentication_role
       end
     end
 

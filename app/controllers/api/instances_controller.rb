@@ -1,6 +1,6 @@
 module Api
   class InstancesController < BaseController
-    def terminate_resource_instances(type, id = nil, _data = nil)
+    def terminate_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for terminating a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -10,7 +10,7 @@ module Api
       end
     end
 
-    def stop_resource_instances(type, id = nil, _data = nil)
+    def stop_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for stopping a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -23,7 +23,7 @@ module Api
       end
     end
 
-    def start_resource_instances(type, id = nil, _data = nil)
+    def start_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for starting a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -36,7 +36,7 @@ module Api
       end
     end
 
-    def pause_resource_instances(type, id = nil, _data = nil)
+    def pause_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for pausing a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -49,7 +49,7 @@ module Api
       end
     end
 
-    def suspend_resource_instances(type, id = nil, _data = nil)
+    def suspend_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for suspending a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -62,7 +62,7 @@ module Api
       end
     end
 
-    def shelve_resource_instances(type, id = nil, _data = nil)
+    def shelve_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for shelving a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -75,7 +75,7 @@ module Api
       end
     end
 
-    def reboot_guest_resource_instances(type, id = nil, _data = nil)
+    def reboot_guest_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for rebooting a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -88,7 +88,7 @@ module Api
       end
     end
 
-    def reset_resource_instances(type, id = nil, _data = nil)
+    def reset_resource(type, id = nil, _data = nil)
       raise BadRequestError, "Must specify an id for resetting a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -140,8 +140,12 @@ module Api
     end
 
     def validate_instance_for_action(instance, action)
-      validation = instance.send("validate_#{action}")
-      action_result(validation[:available], validation[:message].to_s)
+      if instance.respond_to?("supports_#{action}?")
+        action_result(instance.public_send("supports_#{action}?"), instance.unsupported_reason(action.to_sym))
+      else
+        validation = instance.send("validate_#{action}")
+        action_result(validation[:available], validation[:message].to_s)
+      end
     end
 
     def suspend_instance(instance)

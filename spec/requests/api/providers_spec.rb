@@ -66,6 +66,19 @@ describe "Providers API" do
       }
     }
   end
+  let(:updated_connection) do
+    {
+      "endpoint"       => {
+        "role"     => "default",
+        "hostname" => "sample_openshift_multi_end_point.provider.com",
+        "port"     => "8443"
+      },
+      "authentication" => {
+        "role"     => "bearer",
+        "auth_key" => SecureRandom.hex
+      }
+    }
+  end
   let(:hawkular_connection) do
     {
       "endpoint"       => {
@@ -87,7 +100,143 @@ describe "Providers API" do
     }
   end
 
+  context "Provider custom_attributes" do
+    let(:provider) { FactoryGirl.create(:ext_management_system, sample_rhevm) }
+    let(:provider_url) { providers_url(provider.id) }
+    let(:ca1) { FactoryGirl.create(:custom_attribute, :name => "name1", :value => "value1") }
+    let(:ca2) { FactoryGirl.create(:custom_attribute, :name => "name2", :value => "value2") }
+    let(:provider_ca_url) { "#{provider_url}/custom_attributes" }
+    let(:ca1_url) { "#{provider_ca_url}/#{ca1.id}" }
+    let(:ca2_url) { "#{provider_ca_url}/#{ca2.id}" }
+    let(:provider_ca_url_list) { [ca1_url, ca2_url] }
+
+    it "getting custom_attributes from a provider with no custom_attributes" do
+      api_basic_authorize
+
+      run_get(provider_ca_url)
+
+      expect_empty_query_result(:custom_attributes)
+    end
+
+    it "getting custom_attributes from a provider" do
+      api_basic_authorize
+      provider.custom_attributes = [ca1, ca2]
+
+      run_get provider_ca_url
+
+      expect_query_result(:custom_attributes, 2)
+
+      expect_result_resources_to_include_hrefs("resources", :provider_ca_url_list)
+    end
+
+    it "getting custom_attributes from a provider in expanded form" do
+      api_basic_authorize
+      provider.custom_attributes = [ca1, ca2]
+
+      run_get provider_ca_url, :expand => "resources"
+
+      expect_query_result(:custom_attributes, 2)
+
+      expect_result_resources_to_include_data("resources", "name" => %w(name1 name2))
+    end
+
+    it "getting custom_attributes from a provider using expand" do
+      api_basic_authorize action_identifier(:providers, :read, :resource_actions, :get)
+      provider.custom_attributes = [ca1, ca2]
+
+      run_get provider_url, :expand => "custom_attributes"
+
+      expect_single_resource_query("guid" => provider.guid)
+
+      expect_result_resources_to_include_data("custom_attributes", "name" => %w(name1 name2))
+    end
+
+    it "delete a custom_attribute without appropriate role" do
+      api_basic_authorize
+      provider.custom_attributes = [ca1]
+
+      run_post(provider_ca_url, gen_request(:delete, nil, provider_url))
+
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it "delete a custom_attribute from a provider via the delete action" do
+      api_basic_authorize action_identifier(:providers, :edit)
+      provider.custom_attributes = [ca1]
+
+      run_post(provider_ca_url, gen_request(:delete, nil, ca1_url))
+
+      expect(response).to have_http_status(:ok)
+
+      expect(provider.reload.custom_attributes).to be_empty
+    end
+
+    it "add custom attribute to a provider without a name" do
+      api_basic_authorize action_identifier(:providers, :edit)
+
+      run_post(provider_ca_url, gen_request(:add, "value" => "value1"))
+
+      expect_bad_request("Must specify a name")
+    end
+
+    it "add custom attributes to a provider" do
+      api_basic_authorize action_identifier(:providers, :edit)
+
+      run_post(provider_ca_url, gen_request(:add, [{"name" => "name1", "value" => "value1"},
+                                                   {"name" => "name2", "value" => "value2"}]))
+      expected = {
+        "results" => a_collection_containing_exactly(
+          a_hash_including("name" => "name1", "value" => "value1", "section" => "metadata"),
+          a_hash_including("name" => "name2", "value" => "value2", "section" => "metadata")
+        )
+      }
+      expect(response).to have_http_status(:ok)
+
+      expect(response.parsed_body).to include(expected)
+
+      expect(provider.custom_attributes.size).to eq(2)
+    end
+
+    it "formats custom attribute of type date" do
+      api_basic_authorize action_identifier(:providers, :edit)
+      date_field = DateTime.new.in_time_zone
+
+      run_post(provider_ca_url, gen_request(:add, [{"name"       => "name1",
+                                                    "value"      => date_field,
+                                                    "field_type" => "DateTime"}]))
+
+      expect(response).to have_http_status(:ok)
+
+      expect(provider.custom_attributes.first.serialized_value).to eq(date_field)
+
+      expect(provider.custom_attributes.first.section).to eq("metadata")
+    end
+
+    it "edit a custom attribute by name" do
+      api_basic_authorize action_identifier(:providers, :edit)
+      provider.custom_attributes = [ca1]
+
+      run_post(provider_ca_url, gen_request(:edit, "name" => "name1", "value" => "value one"))
+
+      expect(response).to have_http_status(:ok)
+
+      expect_result_resources_to_include_data("results", "value" => ["value one"])
+
+      expect(provider.reload.custom_attributes.first.value).to eq("value one")
+    end
+  end
+
   describe "Providers actions on Provider class" do
+    let(:foreman_type) { ManageIQ::Providers::Foreman::Provider }
+    let(:sample_foreman) do
+      {
+        :name        => 'my-foreman',
+        :type        => foreman_type.to_s,
+        :credentials => {:userid => 'admin', :password => 'changeme'},
+        :url         => 'https://foreman.example.com'
+      }
+    end
+
     it "rejects requests with invalid provider_class" do
       api_basic_authorize
 
@@ -105,6 +254,22 @@ describe "Providers API" do
       klass = Provider
       expect_query_result(:providers, klass.count, klass.count)
       expect_result_resources_to_include_data("resources", "name" => klass.pluck(:name))
+    end
+
+    it 'creates valid foreman provider' do
+      api_basic_authorize collection_action_identifier(:providers, :create)
+
+      # TODO: provider_class in params, when supported (https://github.com/brynary/rack-test/issues/150)
+      run_post(providers_url + '?provider_class=provider', gen_request(:create, sample_foreman))
+
+      expect(response).to have_http_status(:ok)
+
+      provider_id = response.parsed_body["results"].first["id"]
+      expect(foreman_type.exists?(provider_id)).to be_truthy
+      provider = foreman_type.find(provider_id)
+      [:name, :type, :url].each do |item|
+        expect(provider.send(item)).to eq(sample_foreman[item])
+      end
     end
   end
 
@@ -170,7 +335,7 @@ describe "Providers API" do
       ems = ExtManagementSystem.find(provider_id)
       expect(ems.authentications.size).to eq(1)
       ENDPOINT_ATTRS.each do |attr|
-        expect(ems.send(attr)).to eq(sample_openshift[attr])
+        expect(ems.send(attr)).to eq(sample_openshift[attr]) if sample_openshift.key? attr
       end
     end
 
@@ -338,6 +503,45 @@ describe "Providers API" do
       expect_single_resource_query("id" => provider.id, "name" => "updated vmware")
       expect(provider.reload.name).to eq("updated vmware")
       expect(provider.authentication_userid).to eq("superadmin")
+    end
+
+    it "does not schedule a new credentials check if endpoint does not change" do
+      api_basic_authorize collection_action_identifier(:providers, :edit)
+
+      provider = FactoryGirl.create(:ext_management_system, sample_openshift_multi_end_point)
+      MiqQueue.where(:method_name => "authentication_check_types",
+                     :class_name  => "ExtManagementSystem",
+                     :instance_id => provider.id).delete_all
+
+      run_post(providers_url(provider.id), gen_request(:edit,
+                                                       "connection_configurations" => [default_connection,
+                                                                                       hawkular_connection]))
+
+      queue_jobs = MiqQueue.where(:method_name => "authentication_check_types",
+                                  :class_name  => "ExtManagementSystem",
+                                  :instance_id => provider.id)
+      expect(queue_jobs).to be
+      expect(queue_jobs.length).to eq(0)
+    end
+
+    it "schedules a new credentials check if endpoint change" do
+      api_basic_authorize collection_action_identifier(:providers, :edit)
+
+      provider = FactoryGirl.create(:ext_management_system, sample_openshift_multi_end_point)
+      MiqQueue.where(:method_name => "authentication_check_types",
+                     :class_name  => "ExtManagementSystem",
+                     :instance_id => provider.id).delete_all
+
+      run_post(providers_url(provider.id), gen_request(:edit,
+                                                       "connection_configurations" => [updated_connection,
+                                                                                       hawkular_connection]))
+
+      queue_jobs = MiqQueue.where(:method_name => "authentication_check_types",
+                                  :class_name  => "ExtManagementSystem",
+                                  :instance_id => provider.id)
+      expect(queue_jobs).to be
+      expect(queue_jobs.length).to eq(1)
+      expect(queue_jobs[0].args[0][0]).to eq(:bearer)
     end
 
     it "supports additions of credentials" do

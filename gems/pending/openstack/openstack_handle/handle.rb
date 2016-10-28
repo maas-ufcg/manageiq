@@ -26,7 +26,8 @@ module OpenstackHandle
       "Baremetal"     => :baremetal,
       "Orchestration" => :orchestration,
       "Planning"      => :planning,
-      "Introspection" => :introspection
+      "Introspection" => :introspection,
+      "Workflow"      => :workflow
     }
 
     def self.try_connection(security_protocol, ssl_options = {})
@@ -67,11 +68,14 @@ module OpenstackHandle
       # throw an error trying to build an connection error message.
       opts[:openstack_service_type] = ["object-store"] if service == "Storage"
       opts[:openstack_service_type] = ["nfv-orchestration"] if service == "NFV"
+      opts[:openstack_service_type] = ["workflowv2"] if service == "Workflow"
 
       if service == "Planning"
         # Special behaviour for Planning service Tuskar, since it is OpenStack specific service, there is no
         # Fog::Planning module, only Fog::OpenStack::Planning
         Fog::Openstack.const_get(service).new(opts)
+      elsif service == "Workflow"
+        Fog::Workflow::OpenStack.new(opts)
       else
         Fog.const_get(service).new(opts)
       end
@@ -252,6 +256,7 @@ module OpenstackHandle
       connect(:service => "Volume", :tenant_name => tenant_name)
     end
     alias_method :connect_volume, :volume_service
+    alias_method :cinder_service, :volume_service
 
     def detect_volume_service(tenant_name = nil)
       detect_service("Volume", tenant_name)
@@ -261,6 +266,7 @@ module OpenstackHandle
       connect(:service => "Storage", :tenant_name => tenant_name)
     end
     alias_method :connect_storage, :storage_service
+    alias_method :swift_service,   :storage_service
 
     def detect_storage_service(tenant_name = nil)
       detect_service("Storage", tenant_name)
@@ -278,10 +284,19 @@ module OpenstackHandle
     def introspection_service(tenant_name = nil)
       connect(:service => "Introspection", :tenant_name => tenant_name)
     end
-    alias_method :connect_introspection, :metering_service
+    alias_method :connect_introspection, :introspection_service
 
     def detect_introspection_service(tenant_name = nil)
       detect_service("Introspection", tenant_name)
+    end
+
+    def workflow_service(tenant_name = nil)
+      connect(:service => "Workflow", :tenant_name => tenant_name)
+    end
+    alias_method :connect_workflow, :workflow_service
+
+    def detect_workflow_service(tenant_name = nil)
+      detect_service("Workflow", tenant_name)
     end
 
     def detect_service(service, tenant_name = nil)

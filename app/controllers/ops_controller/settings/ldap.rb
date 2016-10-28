@@ -142,15 +142,12 @@ module OpsController::Settings::Ldap
       @in_a_form = true
       begin
         ldap_server.verify_credentials
-      rescue StandardError => bang
-        add_flash("#{bang}", :error)
+      rescue => bang
+        add_flash(bang.to_s, :error)
       else
         add_flash(_("Credential validation was successful"))
       end
-      render :update do |page|
-        page << javascript_prologue
-        page.replace("flash_msg_div_entries", :partial => "layouts/flash_msg", :locals => {:div_num => "entries"})
-      end
+      javascript_flash
     elsif params[:button] == "cancel"
       @ldap_domain = session[:edit][:ldap_domain] if session[:edit] && session[:edit][:ldap_domain]
       if !@ldap_domain || @ldap_domain.id.blank?
@@ -206,11 +203,7 @@ module OpsController::Settings::Ldap
         server = {}
         server[:hostname] = params[:entry][:hostname]
         if params[:entry][:hostname] == ""
-          add_flash(_("Hostname is required"), :error)
-          render :update do |page|
-            page << javascript_prologue
-            page.replace("flash_msg_div_entries", :partial => "layouts/flash_msg", :locals => {:div_num => "entries"})
-          end
+          render_flash(_("Hostname is required"), :error)
           return
         else
           server[:mode] = params[:entry_mode]

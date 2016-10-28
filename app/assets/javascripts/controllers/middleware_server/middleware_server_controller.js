@@ -8,13 +8,14 @@ MwServerController.$inject = ['$scope', 'miqService' ];
  * We are now using Rx.js Observables instead of miqCallAngular, for sending configurable
  * data from miq buttons.
  * This is the parent controller for the page that is bootstrapped,
- * interacting with the page via $scope and then $broadcast events down to the sub
+ * interacting with the page via $scope and then 'sendDataWithRx' events down to the sub
  * controllers to handle them in isolation.
  *
  * Controller Hierarchy is:
  * - MwServerController
  * -- MwServerOpsController
  * -- MwAddDeploymentController
+ * -- MwAddDatasourceController
  * -- *Any other controllers (more coming...)
  *
  * This is certainly not ideal, but allows us to use multiple controllers on a page.
@@ -32,7 +33,7 @@ function MwServerController($scope, miqService) {
         operation = event.operation,
         timeout = event.timeout;
 
-    $scope.paramsModel = {};
+    $scope.paramsModel = $scope.paramsModel || {};
     if (eventType == 'mwServerOps'  && operation) {
       $scope.paramsModel.serverId = angular.element('#mw_param_server_id').val();
       $scope.paramsModel.operation = operation;
@@ -65,6 +66,7 @@ function MwServerController($scope, miqService) {
 
   $scope.deployAddModel = {};
   $scope.deployAddModel.enableDeployment = true;
+  $scope.deployAddModel.forceDeploy = false;
   $scope.deployAddModel.serverId = angular.element('#server_id').val();
 
   $scope.showDeployListener = function () {
@@ -72,8 +74,13 @@ function MwServerController($scope, miqService) {
     $scope.resetDeployForm();
   };
 
+  $scope.showDatasourceListener = function () {
+    // just here to 'Button not implemented'
+  };
+
   $scope.resetDeployForm = function () {
     $scope.deployAddModel.enableDeployment = true;
+    $scope.deployAddModel.forceDeploy = false;
     $scope.deployAddModel.runtimeName = undefined;
     $scope.deployAddModel.filePath = undefined;
     angular.element('#deploy_div :file#upload_file').val('');
@@ -89,6 +96,34 @@ function MwServerController($scope, miqService) {
   $scope.addDeployment = function () {
     miqService.sparkleOn();
     $scope.$broadcast('mwAddDeploymentEvent', $scope.deployAddModel);
+  };
+
+  /////////////////////////////////////////////////////////////////////////
+  // Add JDBC Driver
+  /////////////////////////////////////////////////////////////////////////
+
+  $scope.showJdbcDriverListener = function () {
+    $scope.resetJdbcDriverForm();
+    $scope.jdbcDriverModel.showDeployModal = true;
+  };
+
+  $scope.resetJdbcDriverForm = function () {
+    $scope.jdbcDriverModel = {};
+    $scope.jdbcDriverModel.serverId = angular.element('#server_id').val();
+    angular.element('#jdbc_add_div :file#jdbc_driver_file').val('');
+    angular.element('#jdbc_add_div input[type="text"]:disabled').val('');
+    $scope.$broadcast('mwAddJdbcDriverReset');
+  };
+
+  $scope.$watch('jdbcDriverModel.filePath', function(newValue) {
+    if (newValue) {
+      $scope.jdbcDriverModel.driverJarName = newValue.name;
+    }
+  });
+
+  $scope.addJdbcDriver = function () {
+    miqService.sparkleOn();
+    $scope.$broadcast('mwAddJdbcDriverEvent', $scope.jdbcDriverModel);
   };
 }
 

@@ -25,7 +25,7 @@ describe Menu::DefaultMenu do
       FactoryGirl.create(:host_openstack_infra, :ems_id => @ems_openstack.id)
       menu = Menu::DefaultMenu.infrastructure_menu_section.items.map(&:name)
       result = ["Providers", "Clusters", "Nodes", "Virtual Machines", "Resource Pools",
-                "Datastores", "PXE", "Requests"]
+                "Datastores", "PXE", "Networking", "Requests"]
       expect(menu).to eq(result)
     end
 
@@ -33,7 +33,7 @@ describe Menu::DefaultMenu do
       FactoryGirl.create(:host_vmware, :ems_id => @ems_vmware.id)
       menu = Menu::DefaultMenu.infrastructure_menu_section.items.map(&:name)
       result = ["Providers", "Clusters", "Hosts", "Virtual Machines", "Resource Pools",
-                "Datastores", "PXE", "Requests"]
+                "Datastores", "PXE", "Networking", "Requests"]
       expect(menu).to eq(result)
     end
 
@@ -43,7 +43,7 @@ describe Menu::DefaultMenu do
 
       menu = Menu::DefaultMenu.infrastructure_menu_section.items.map(&:name)
       result = ["Providers", "Clusters", "Hosts / Nodes", "Virtual Machines", "Resource Pools",
-                "Datastores", "PXE", "Requests"]
+                "Datastores", "PXE", "Networking", "Requests"]
       expect(menu).to eq(result)
     end
 
@@ -52,7 +52,7 @@ describe Menu::DefaultMenu do
 
       menu = Menu::DefaultMenu.infrastructure_menu_section.items.map(&:name)
       result = ["Providers", "Deployment Roles", "Hosts", "Virtual Machines", "Resource Pools",
-                "Datastores", "PXE", "Requests"]
+                "Datastores", "PXE", "Networking", "Requests"]
       expect(menu).to eq(result)
     end
 
@@ -61,7 +61,7 @@ describe Menu::DefaultMenu do
 
       menu = Menu::DefaultMenu.infrastructure_menu_section.items.map(&:name)
       result = ["Providers", "Clusters", "Hosts", "Virtual Machines", "Resource Pools",
-                "Datastores", "PXE", "Requests"]
+                "Datastores", "PXE", "Networking", "Requests"]
       expect(menu).to eq(result)
     end
 
@@ -71,8 +71,82 @@ describe Menu::DefaultMenu do
 
       menu = Menu::DefaultMenu.infrastructure_menu_section.items.map(&:name)
       result = ["Providers", "Clusters / Deployment Roles", "Hosts", "Virtual Machines", "Resource Pools",
-                "Datastores", "PXE", "Requests"]
+                "Datastores", "PXE", "Networking", "Requests"]
       expect(menu).to eq(result)
+    end
+  end
+
+  describe "#storage_menu_section" do
+    let(:menu) { Menu::DefaultMenu }
+    let(:configuration) { double(:config => {:product => {:storage => product_setting}}) }
+
+    before do
+      allow(VMDB::Config).to receive(:new).with("vmdb").and_return(configuration)
+    end
+
+    context "when the configuration storage product setting is set to true" do
+      let(:product_setting) { true }
+
+      it "contains the generic objects item" do
+        expect(menu.storage_menu_section.items.map(&:name)).to include(
+          "Storage Providers",
+          "Volumes",
+          "Object Stores",
+          "NetApp"
+        )
+      end
+    end
+
+    context "when the configuration storage product setting is not true" do
+      let(:product_setting) { "juliet" }
+
+      it "does not contain the NetApp item" do
+        expect(menu.storage_menu_section.items.map(&:name)).to include(
+          "Storage Providers",
+          "Volumes",
+          "Object Stores",
+        )
+      end
+    end
+  end
+
+  describe "#automate_menu_section" do
+    let(:menu) { Menu::DefaultMenu }
+    let(:configuration) { double(:config => {:product => {:generic_object => product_setting}}) }
+
+    before do
+      allow(VMDB::Config).to receive(:new).with("vmdb").and_return(configuration)
+    end
+
+    context "when the configuration generic object product setting is set to true" do
+      let(:product_setting) { true }
+
+      it "contains the generic objects item" do
+        expect(menu.automate_menu_section.items.map(&:name)).to include(
+          "Explorer",
+          "Simulation",
+          "Customization",
+          "Generic Objects",
+          "Import / Export",
+          "Log",
+          "Requests"
+        )
+      end
+    end
+
+    context "when the configuration generic object product setting is not true" do
+      let(:product_setting) { "potato" }
+
+      it "does not contain the generic objects item" do
+        expect(menu.automate_menu_section.items.map(&:name)).to include(
+          "Explorer",
+          "Simulation",
+          "Customization",
+          "Import / Export",
+          "Log",
+          "Requests"
+        )
+      end
     end
   end
 end

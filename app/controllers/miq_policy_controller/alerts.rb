@@ -82,9 +82,6 @@ module MiqPolicyController::Alerts
     @edit[:new][:repeat_time] = params[:repeat_time].to_i if params[:repeat_time]
     @edit[:new][:event_name] = params[:event_name] if params[:event_name]
 
-    # Removed following line, not allowing this option to be changed in the UI at this time (v3.3, sprint 66)
-    #   @edit[:new][:expression][:mode] = params[:use_automate_cb] == "1" ? "automate" : "internal" if params.has_key?(:use_automate_cb)
-
     if params[:miq_alert_db]
       @edit[:new][:db] = params[:miq_alert_db]
       @edit[:expression_types] = MiqAlert.expression_types(@edit[:new][:db])
@@ -459,11 +456,6 @@ module MiqPolicyController::Alerts
       5.minutes.to_i => _("5 Minutes"), 10.minutes.to_i => _("10 Minutes"), 15.minutes.to_i => "15 Minutes", 30.minutes.to_i => "30 Minutes",
       1.hour.to_i => "1 Hour", 2.hours.to_i => "2 Hours", 3.hours.to_i => "3 Hours", 4.hours.to_i => "4 Hours", 6.hours.to_i => "6 Hours", 12.hours.to_i => "12 Hours",
       1.day.to_i => "1 Day"
-      # Stopping this at 1 day for now - Sprint 53
-      #     , 2.days.to_i=>"2 Days", 3.days.to_i=>"3 Days", 4.days.to_i=>"4 Days", 5.days.to_i=>"5 Days", 6.days.to_i=>"6 Days",
-      #     1.week.to_i=>"1 Week", 2.weeks.to_i=>"2 Weeks", 3.weeks.to_i=>"3 Weeks",
-      #     1.month.to_i=>"1 Month", 2.months.to_i=>"2 Months", 3.months.to_i=>"3 Months", 6.months.to_i=>"6 Months",
-      #     1.year.to_i=>"1 Year"
     }
 
     # :hourly_time_thresholds
@@ -477,9 +469,6 @@ module MiqPolicyController::Alerts
       1.minutes.to_i => "1 Minute", 2.minutes.to_i => "2 Minutes", 3.minutes.to_i => "3 Minutes", 4.minutes.to_i => "4 Minutes",
       5.minutes.to_i => "5 Minutes", 10.minutes.to_i => "10 Minutes", 15.minutes.to_i => "15 Minutes", 30.minutes.to_i => "30 Minutes",
       1.hour.to_i => "1 Hour", 2.hours.to_i => "2 Hours"
-      # Stopping this at 2 hours now - Sprint 65
-      #     , 3.hours.to_i=>"3 Hours", 4.hours.to_i=>"4 Hours", 6.hours.to_i=>"6 Hours", 12.hours.to_i=>"12 Hours",
-      #     1.day.to_i=>"1 Day"
     }
 
     # hourly_performance repeat times for Notify Every pull down
@@ -501,7 +490,7 @@ module MiqPolicyController::Alerts
     alarms = {}
     begin
       alarms = MiqAlert.ems_alarms(@edit[:new][:db], @edit[:new][:expression][:options][:ems_id])
-    rescue StandardError => bang
+    rescue => bang
       add_flash(_("Error during alarms: %{messages}") % {:messages => bang.message}, :error)
     end
     alarms
@@ -583,14 +572,16 @@ module MiqPolicyController::Alerts
       unless value_greater_than && is_integer?(value_greater_than)
         add_flash(_(template_error % [">", non, an_integer]), :error)
       end
-      unless value_greater_than.to_i.between?(0, 100)
+      value_greater_than = value_greater_than.to_i
+      unless value_greater_than.between?(0, 100)
         add_flash(_(template_error % [">", non, between]), :error)
       end
       value_less_than = @edit.fetch_path(:new, :expression, :options, :value_mw_less_than)
       unless value_less_than && is_integer?(value_less_than)
         add_flash(_(template_error % ["<", non, an_integer]), :error)
       end
-      unless value_less_than.to_i.between?(0, 100)
+      value_less_than = value_less_than.to_i
+      unless value_less_than.between?(0, 100)
         add_flash(_(template_error % ["<", non, between]), :error)
       end
       if value_less_than && value_greater_than && (value_less_than >= value_greater_than)

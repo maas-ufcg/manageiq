@@ -2,6 +2,363 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased - as of Sprint 47 end 2016-10-03
+
+### [Added](https://github.com/ManageIQ/manageiq/issues?q=milestone%3A%22Sprint+47+Ending+Oct+3%2C+2016%22+label%3Aenhancement)
+
+- Automate
+  - Provisioning
+    - Filter networks and floating_ips for OpenStack provisioning
+    - Added Google pre and post provisioning methods
+    - Enabled support for vApp provisioning service
+    - Backend support to enable VMware provisioning through selection of a DRS-enabled cluster instead of a host
+    - Set VM storage profile in provisioning
+  - Services
+    - Log properly dynamic dialog field script error
+    - Back-end support for Power Operations on Services
+      - Service Items: Pass start/stop commands to associated resources.
+      - Service Bundles: Honor bundle resource configuration for start/stop actions
+  - Added top_level_namespace to miq_ae_namespace model to support filtering for pluggable providers
+  - Created service_connections table to support connecting services together along with metadata
+  - Generic Objects
+    - Process Generic Object method call via automate
+    - Methods content stored in Automate
+    - Generic Object Definition model contains the method name only (Parameters defined in automate)
+    - Methods can return data to caller
+    - Methods can be overridden by domain ordering
+- Platform
+  - Centralized Administration
+    - VM power operations
+    - VM retirement
+    - Leverages new ManageIQ API Client gem
+  - Chargeback
+    - Generate monthly report for a Service
+Instance method on Service class
+    - Daily schedule generates report for each Service
+    - Enables SUI display of Service costs over last 30 days
+    - Containers
+      - Added image tag names for Containers in vim performance state.
+      - Added a 'fixed_compute_metric' column to chargeback
+      - Added rate assigning by tags to container images
+      - Chargeback vm group by tag
+  - Notifications
+    - Dynamic substitution in notification messages
+    - Generate for Lifecycle events
+  - Tenancy
+    - Mapping Cloud Tenants to ManageIQ Tenants
+      - Prevent deleting mapped tenants from cloud provider
+      - Added checkbox "Tenant Mapping Enabled" to Openstack Manager
+    - Ad hoc sharing of resources across tenants
+      - Backend modeling completed
+      - Implementation in progress
+- Providers
+  - Core
+    - Override default http proxy
+    - Default reasons for supported features
+    - Known features are discoverable
+    - Every known feature is unsupported by default
+    - `supports :reboot_guest`
+  - Generate a csv of features supported across all models
+  - Containers
+    - Allow policies to prevent Container image scans
+    - Chargeback rates based on container image tags
+    - Keep pod-container relationship after disconnection
+  - Google Compute Engine: Load Balancer refresh
+  - Middleware (Hawkular)
+    - Change labels in middleware topology
+    - Added "Server State" into Middleware Server Details
+    - Enabled search for Middleware entities
+    - Users can add Middleware Datasources and JDBC Drivers
+    - Metrics for JMS Topics and Queues
+  - Microsoft Cloud (Azure)
+    - Load Balancer inventory collection for Azure
+    - Pagination support in armrest gem
+  - Microsoft Infrastructure (SCVMM)
+    - Set CPU sockets and cores per socket
+  - Network
+    - Nuage policy groups added
+    - Load balancer service type actions for reconfigure, retirement, provisioning
+    - UI for creating subnets
+  - OpenStack
+    - Add hardware state for Hosts
+    - Map Flavors to Cloud Tenants during Openstack Cloud refresh
+    - Cinder backup/restore actions added to model
+    - UI to register Ironic nodes through Mistral
+  - Red Hat Enterprise Virtualization
+    - Report manufacturer and product info for RHEVM hosts
+  - Storage
+    - New Swift Storage Manager
+    - New Cinder Storage Manager
+    - Initial User Interface support for Storage Managers
+  - VMware Cloud
+    - Cloud orchestration stack operation: Create and delete stack
+    - Collect virtual datacenters as availability zones
+    - Event Catcher
+  - VMware Infrastructure: Datastores are filtered by Storage Profiles in provisioning
+- REST API
+  - Version bumped to 2.3.0 in preparation for Euwe release
+  - New /api/automate primary collection
+  - Enhanced to return additional product information for the About modal
+  - Bulk queries now support referencing resources by attributes
+  - Added ability to delete one’s own notifications
+  - Publish Blueprint API
+  - Update Blueprint API to store bundle info in ui_properties
+  - CRUD for Service create and orchestration template
+  - Api for refreshing automate domain from git
+  - Allow compressed IDs in resource references
+- Service UI
+  - Create picture
+  - Generic requests OPTION method
+  - Delete dialogs API
+  - Updated the “update” API for blueprints to be more efficient
+  - Cockpit integration
+  - Added About modal
+- SmartState
+  - Containers: Settings for proxy environment variables
+- User Interface
+  - Add GUID validation for certain Azure fields in Cloud Provider screen
+  - OpenStack: Register new Ironic nodes through Mistral
+  - Timelines resdesigned
+  - vSphere Distributed Switches tagging
+  - Patternfly Labels for OpenSCAP Results
+  - Operations UI Notifications
+
+
+
+
+### [Changed](https://github.com/ManageIQ/manageiq/issues?q=milestone%3A%22Sprint+47+Ending+Oct+3%2C+2016%22+label%3Aenhancement)
+
+- Automate:
+  - Changed Automate import to enable system domains
+  - Google schema changes in Cloud Provision Method class
+- Performance: Do not reload miq server in tree builder
+- Providers: vSphere Host storage device inventory collection improvements
+- REST API: Update API CLI to support the HTTP OPTIONS method.
+- User Interface
+  - Updated PatternFly to v3.11.0
+  - Summary Screen styling updates
+
+### [Fixed](https://github.com/ManageIQ/manageiq/issues?q=milestone%3A%22Sprint+47+Ending+Oct+3%2C+2016%22+label%3bugs)
+
+Notable fixes include:
+
+- Automate
+  - Fixed problem with request_pending email method
+  - Set User.current_user in Automation Engine to fix issue where provisioning resources were not being assigned to the correct tenant
+- Platform
+  - Use correct adjustment in chargeback reports
+  - Replication: Fix typo prevention full error message
+  - Tenancy: User friendly tenant names
+- Providers
+    - Openstack: Catch unauthorized exception in refresh
+    - Middleware: Fix operation timeout parameter fetch
+    - Red Hat Enterprise Virtualization: Access VM Cluster relationship correctly
+- Provisioning: VMware Infrastructure: sysprep_product_id field is no longer required
+- REST API
+  - API: Fix creation of Foreman provider
+  - Ensure api config references only valid miq_product_features
+- SmartState: Update logging and job error message when getting the service account for Containers
+- User Interface
+  - Add missing Searchbar and Advanced Search button
+  - Containers: Download to PDF/CSV/Text - don't download deleted containers
+  - Allow bring VM out of retirement from detail page
+  - Inconsitent menues in Middleware Views
+  - Save Authentication status on a Save
+  - User friendly tenant names
+  - RBAC:List only those VMs that the user has access to in planning
+
+## Unreleased - as of Sprint 46 end 2016-09-12
+
+### [Added](https://github.com/ManageIQ/manageiq/issues?q=milestone%3A%22Sprint+46+Ending+Sep+12%2C+2016%22+label%3Aenhancement)
+
+- Automate
+  - Import Rake task `OVERWRITE` argument: Setting  `OVERWRITE=true` removes the target domain prior to import
+  - New `extend_retires_on` method: Used by Automate methods to set a retirement date to specified number of days from today, or from a future date.
+  - Service model updates
+    - MiqAeServiceHardware
+    - MiqAeServicePartition
+    - MiqAeServiceVolume
+- Platform
+  - Centralized Administration
+    - Server to server authentication
+    - Invoke tasks on remote regions
+    - Leverage new API client (WIP)
+  - Chargeback
+    - Support for generating chargeback for services
+    - Will be used in Service UI for showing the cost of a service
+  - Database Maintenance
+    - Hourly reindex: High Churn Tables
+    - Periodic full vacuum
+    - Configure in appliance console
+  - Notification Backend
+    - Model for asynchronous notifications
+    - Authentication token generation for web sockets
+    - API for notification drawer
+  - PostgreSQL High Availability
+    - DB Cluster - Primary, Standbys
+    - Uses [repmgr](http://www.repmgr.org/) (replication)
+    - Failover
+      - Primary to Standby
+      - Appliance connects to new primary DB
+  - Tenancy: Mapping Cloud Tenants to ManageIQ Tenants
+    - Post refresh hook on OpenStack provider
+    - Create provider base tenant under a root tenant
+    - Cloud Tenant tree generated under provider base tenant
+    - Create / Update / Delete
+- Providers
+  - Containers
+    - Reports: Pods for images per project, Pods per node
+    - Deployment wizard
+  - Google Compute Engine: Provision Preemptible VMs
+  - Hawkular  
+    - JMS support (entities, topology)
+    - Reports for Transactions (in App servers)
+    - Support micro-lifecycle for Middleware-deployments
+    - Middleware provider now uses restful routes
+  - Microsoft Azure
+    - Handle new events: Create Security Group, VM Capture
+    - Provider-specific logging
+  - Networking
+    - Allow port ranges for Load Balancers
+    - Load Balancer user interface
+  - OpenStack
+    - Collect inventory for cloud volume backups
+    - Show topology for undercloud
+    - Associate/Disassociate Floating IPs
+  - Red Hat Enterprise Virtualization
+    - Get Host OS version and type
+    - Disk Management in VM Reconfigure
+  - VMware: Filter Storage by Profile
+  - vCloud
+    - Collect status of vCloud Orchestration Stacks
+    - Add Network Manager
+    - Collect networking inventory
+- REST API
+  - Token manager supports for web sockets
+  - Added querying for cockpit support
+  - Added support for Bulk queries
+  - Added support for UI notification drawer
+  - API entrypoint returns details about the appliance via server_info
+  - Blueprint updates now supports removal of the Service Catalog or Service Dialog from a Blueprint
+- Service Broker: Service UI (name change from Self Service UI)
+  - Renamed due to expanding number of use cases
+  - Adding in Arbitration Rules UI
+- User Interface
+  - Added mandatory Subscription field to Microsoft Azure Discovery screen
+  - Added Notifications Drawer and Toast Notifications List
+  - Added support for vSphere Distributed Switches
+  - Added support to show child/parent relations of Orchestration Stacks
+  - Added Middleware Messaging entities to topology chart
+
+### [Changed](https://github.com/ManageIQ/manageiq/issues?q=milestone%3A%22Sprint+46+Ending+Sep+12%2C+2016%22+label%3Aenhancement)
+
+- Automate: Description for Datastore Reset action now includes list of target domains
+- Performance
+  - Page rendering
+    - Compute -> Infrastructure -> Virtual Machines: 9% faster, 32% fewer rows tested on 3k active vms and 3k archived vms
+    - Services -> My Services: 60% faster, 98% fewer queries, 32% fewer db rows returned
+  - `Ownershipmixin`
+    - Filtering now done in SQL
+    - 99.5% faster (93.8s -> 0.5s) testing
+      - VMs / All VMs / VMs I Own
+      - VMs / All VMs / VMs in My LDAP Group
+- User Interface: Dynatree replaced with bootstrap-treeview
+
+## Unreleased - as of Sprint 45 end 2016-08-22
+
+### [Added](https://github.com/ManageIQ/manageiq/issues?q=milestone%3A%22Sprint+45+Ending+Aug+22%2C+2016%22+label%3Aenhancement)
+
+- Automate
+  - Enhanced messaging for provisioning: Displayed elements
+    - ManageIQ Server name
+    - Name of VM/Service being provisioned
+    - Current Automate state machine step
+    - Status message
+    - Provision Task Message
+    - Retry count (when applicable)
+  - New method `taggable?` to programmatically determine if a Service Model class or instance is taggable.
+  - Generic Objects: Model updates
+    - Associations
+    - Tagging
+    - Service Methods: `add_to_service / remove_from_service`
+  - Git Automate support
+    - Branch/Tag support
+    - Contents are locked and can be copied to other domains for editing
+    - Editable properties
+      - Enabled/Disabled
+      - Priority
+      - Removal of Domain
+    - Dedicated Server Role to store the repository
+- Platform
+  - PostgreSQL High Availability
+    - Primary/Standby DB config in Appliance Console
+    - Database-only appliance config in Appliance Console
+    - Failover Monitor
+  - Tenancy
+    - Groundwork in preparation for supporting multiple entitlements
+    - ApplicationHelper#role_allows and User#role_allows? combined and moved to RBAC
+    - Post refresh hook to queue mapping of Cloud Tenants
+  - Database maintenance scripts added to appliance
+- Providers
+  - Containers: Models for container deployments
+  - Google Compute Engine
+    - Preemptible Instances
+    - Retirement support
+  - Hawkular    
+    - Alerts
+       - Link miq alerts and hawkular events on the provider
+       - Convert ManageIQ alerts/profiles to hawkular group triggers/members of group triggers
+       - Sync the provider when ManageIQ alerts and alert profiles are created/updated
+   - Added entities: Domains and Server Groups including their visualization in topology
+   - Datasource entity now has deletion operation
+   - Support more event types for datasource and deployment
+   - Cross linking to VMs added to topology
+  - Microsoft Azure: Added memory and disk utilization metrics
+  - OpenStack
+    - Host Aggregates
+    - Region Support
+  - Red Hat Enterprise Virtualization: Snapshot support
+  - VMware vSphere: Storage profiles
+- REST API
+  - Support for compressed ids in inbound requests
+  - CRUD support for Arbitration Rules
+- Service Broker
+  - Service Designer: Blueprint API is 90% done, edit and publish are still in development
+  - Arbitration Profiles
+      - Collection of pre-defined settings
+      - Work in conjunction with the Arbitration Engine
+  - Rules Engine: API completed
+- SmartState: Deployed new MiqDiskCache module for use with Microsoft Azure
+    - Scan time reduced from >20 minutes to <5 minutes
+    - Microsoft Azure backed read requests reduced from >7000 requests to <1000
+- User Interface
+  - I18n support for UI plugins
+  - Arbitration Profiles management for Service Broker
+  - Re-check Authentication button added to Provider list views
+  - Provisioning button added to the Templates & Images list and summary screens
+  - Subtype option added to Generic Catalog Items
+  - About modal added to OPS UI
+
+### [Changed](https://github.com/ManageIQ/manageiq/issues?q=milestone%3A%22Sprint+45+Ending+Aug+22%2C+2016%22+label%3Aenhancement)
+
+- Performance: Page rendering performance
+  - Services -> Workloads -> All VMs page load time reduced from 93,770ms to 524ms (99%) with a test of 20,000 VMs
+- Platform
+  - Upgrade ruby 2.2.5 to 2.3.1
+  - Configure Rails web server - Puma or Thin
+    - Puma is still the default
+    - Planning on adding additional servers
+
+### [Fixes](https://github.com/ManageIQ/manageiq/issues?q=milestone%3A%22Sprint+45+Ending+Aug+22%2C+2016%22+label%3A"technical+debt")
+
+Notable fixes include:
+- Microsoft Azure: Fix proxy for template lookups
+- VMware vSphere: Block duplicate events
+- REST API
+  - Hide internal Tenant Groups from /api/groups
+  - Raise 403 Forbidden for deleting read-only groups
+  - API Request logging
+
 ## Unreleased - as of Sprint 44 end 2016-08-1
 
 ### [Added](https://github.com/ManageIQ/manageiq/issues?q=milestone%3A%22Sprint+44+Ending+Aug+1%2C+2016%22+label%3Aenhancement)
@@ -579,7 +936,7 @@ and before subscription is enabled
   - Ability to report on Performance
   - Host Socket and Total VMs metrics
   - Watermark reports available out-of-the-box
-- Google Cloud Engine
+- Google Compute Engine
   - New Provider
   - Ability to validate authentication
 

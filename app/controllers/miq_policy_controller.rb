@@ -58,7 +58,7 @@ class MiqPolicyController < ApplicationController
           end
           session[:export_data] = MiqPolicy.export_to_yaml(@sb[:new][:choices_chosen], db)
           javascript_redirect :action => 'fetch_yaml', :fname => filename, :escape => false
-        rescue StandardError => bang
+        rescue => bang
           add_flash(_("Error during export: %{error_message}") % {:error_message => bang.message}, :error)
           render :update do |page|
             page << javascript_prologue
@@ -126,10 +126,7 @@ class MiqPolicyController < ApplicationController
   }.freeze
 
   def x_button
-    action = params[:pressed]
-
-    raise ActionController::RoutingError, _('invalid button action') unless POLICY_X_BUTTON_ALLOWED_ACTIONS.key?(action)
-    send(POLICY_X_BUTTON_ALLOWED_ACTIONS[action])
+    generic_x_button(POLICY_X_BUTTON_ALLOWED_ACTIONS)
   end
 
   # Send the zipped up logs and zip files
@@ -184,7 +181,7 @@ class MiqPolicyController < ApplicationController
     if params[:commit] == "import"
       begin
         miq_policy_import_service.import_policy(@import_file_upload_id)
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("Error during upload: %{messages}") % {:messages => bang.message}, :error)
       else
         @sb[:hide] = false
@@ -293,7 +290,7 @@ class MiqPolicyController < ApplicationController
   def log
     @breadcrumbs = []
     @log = $policy_log.contents(nil, 1000)
-    add_flash(_("Logs for this CFME Server are not available for viewing"), :warning)  if @log.blank?
+    add_flash(_("Logs for this %{product} Server are not available for viewing") % {:product => I18n.t('product.name')}, :warning) if @log.blank?
     @lastaction = "policy_logs"
     @layout = "miq_policy_logs"
     @msg_title = "Policy"
@@ -308,7 +305,7 @@ class MiqPolicyController < ApplicationController
   def refresh_log
     @log = $policy_log.contents(nil, 1000)
     @server = MiqServer.my_server
-    add_flash(_("Logs for this CFME Server are not available for viewing"), :warning)  if @log.blank?
+    add_flash(_("Logs for this %{product} Server are not available for viewing") % {:product => I18n.t('product.name')}, :warning) if @log.blank?
     replace_main_div :partial => "layouts/log_viewer"
   end
 
@@ -510,7 +507,7 @@ class MiqPolicyController < ApplicationController
 
     r = proc { |opts| render_to_string(opts) }
 
-    # With dynatree, simply replace the tree partials to reload the trees
+    # Simply replace the tree partials to reload the trees
     replace_trees.each do |name|
       case name
       when :policy_profile
@@ -618,15 +615,12 @@ class MiqPolicyController < ApplicationController
     when 'co'
       # Set the JS types and titles vars if value fields are showing (needed because 2 expression editors are present)
       if @edit && @edit[@expkey]
-        set_exp_val = proc do |val|
-          if @edit[@expkey][val]  # if an expression with value 1 is showing
-            presenter[:exp] = {}
-            presenter[:exp]["#{val}_type".to_sym]  = @edit[@expkey][val][:type].to_s if @edit[@expkey][val][:type]
-            presenter[:exp]["#{val}_title".to_sym] = @edit[@expkey][val][:title]     if @edit[@expkey][val][:title]
-          end
+        [:val1, :val2].each do |val|
+          next unless @edit[@expkey][val] # unless an expression with value 1 is showing
+          presenter[:exp] = {}
+          presenter[:exp]["#{val}_type".to_sym]  = @edit[@expkey][val][:type].to_s if @edit[@expkey][val][:type]
+          presenter[:exp]["#{val}_title".to_sym] = @edit[@expkey][val][:title]     if @edit[@expkey][val][:title]
         end
-        set_exp_val.call(:val1)
-        set_exp_val.call(:val2)
       end
       presenter.update(:main_div, r[:partial => 'condition_details', :locals => {:read_only => true}])
       right_cell_text = if @condition.id.blank?

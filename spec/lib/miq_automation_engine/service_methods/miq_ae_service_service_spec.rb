@@ -5,8 +5,7 @@ module MiqAeServiceServiceSpec
     let(:user)            { FactoryGirl.create(:user_with_group) }
 
     before(:each) do
-      MiqAutomateHelper.create_service_model_method('SPEC_DOMAIN', 'EVM',
-                                                    'AUTOMATE', 'test1', 'test')
+      Spec::Support::MiqAutomateHelper.create_service_model_method('SPEC_DOMAIN', 'EVM', 'AUTOMATE', 'test1', 'test')
       @ae_method     = ::MiqAeMethod.first
       @ae_result_key = 'foo'
 
@@ -162,7 +161,7 @@ EOF
       service_service.finish_retirement
 
       expect(service_service.retired).to be_truthy
-      expect(service_service.retires_on).to eq(Date.today)
+      expect(service_service.retires_on).to be_between(Time.zone.now - 1.hour, Time.zone.now + 1.second)
       expect(service_service.retirement_state).to eq("retired")
     end
 

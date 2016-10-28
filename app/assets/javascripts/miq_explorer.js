@@ -22,9 +22,10 @@ ManageIQ.explorer.buildCalendar = function(options) {
   miqBuildCalendar();
 };
 
-ManageIQ.explorer.lock_tree = function(tree, lock) {
-  $('#' + tree + 'box').dynatree(lock ? 'disable' : 'enable');
-  miqDimDiv('#' + tree + '_div', lock);
+ManageIQ.explorer.lock_tree = function(tree_name, lock) {
+  var tree = miqTreeObject(tree_name);
+  lock ? tree.disableAll({silent: true, keepState: true}) : tree.enableAll();
+  miqDimDiv('#' + tree_name + '_div', lock);
 };
 
 ManageIQ.explorer.clearSearchToggle = function(show) {
@@ -49,7 +50,17 @@ ManageIQ.explorer.process = function(data) {
     case 'buttons':
       ManageIQ.explorer.processButtons(data);
       break;
+    case 'window':
+      ManageIQ.explorer.processWindow(data);
+      break;
   }
+};
+
+ManageIQ.explorer.processWindow = function(data) {
+  if (_.isString(data.openUrl)) {
+    window.open(data.openUrl);
+  }
+  ManageIQ.explorer.spinnerOff(data);
 };
 
 ManageIQ.explorer.processButtons = function(data) {
@@ -62,6 +73,13 @@ ManageIQ.explorer.processReplaceMainDiv = function(data) {
 
 ManageIQ.explorer.processFlash = function(data) {
   ManageIQ.explorer.replacePartials(data);
+  ManageIQ.explorer.spinnerOff(data);
+  ManageIQ.explorer.scrollTop(data);
+  ManageIQ.explorer.focus(data);
+
+  if (!_.isUndefined(data.activateNode)) {
+    miqTreeActivateNode(data.activateNode.tree, data.activateNode.node);
+  }
 };
 
 ManageIQ.explorer.replacePartials = function(data) {
@@ -86,9 +104,23 @@ ManageIQ.explorer.spinnerOff = function(data) {
   }
 };
 
+
+ManageIQ.explorer.scrollTop = function(data) {
+  if (data.scrollTop) {
+    $('#main_div').scrollTop(0);
+  }
+};
+
 ManageIQ.explorer.miqButtons = function(data) {
   miqButtons(data.showMiqButtons ? 'show' : 'hide');
 };
+
+ManageIQ.explorer.focus = function(data) {
+  if (_.isString(data.focus)) {
+    var element = $('#' + data.focus);
+    if ( element.length ) element.focus();
+  }
+}
 
 ManageIQ.explorer.processReplaceRightCell = function(data) {
   /* variables for the expression editor */
@@ -114,7 +146,7 @@ ManageIQ.explorer.processReplaceRightCell = function(data) {
 
   ManageIQ.explorer.miqButtons(data);
 
-  if (_.isString(data.clearTreeCookies)) { miqDeleteDynatreeCookies(data.clearTreeCookies); }
+  if (_.isString(data.clearTreeCookies)) { miqDeleteTreeCookies(data.clearTreeCookies); }
 
   if (_.isString(data.accordionSwap)) {
     miqAccordionSwap('#accordion .panel-collapse.collapse.in', '#' + data.accordionSwap + '_accord');
@@ -130,16 +162,13 @@ ManageIQ.explorer.processReplaceRightCell = function(data) {
     miqAddNodeChildren(data.addNodes.activeTree,
                        data.addNodes.key,
                        data.addNodes.osf,
-                       data.addNodes.children);
+                       data.addNodes.nodes);
   }
 
 
   if (!_.isUndefined(data.deleteNode)) {
-    var del_node = $('#' + data.deleteNode.activeTree + 'box')
-      .dynatree('getTree')
-      .getNodeByKey(data.deleteNode.node);
-
-    del_node.remove();
+    var del_node = miqTreeFindNodeByKey(data.deleteNode.activeTree, data.deleteNode.node)
+    miqTreeObject(data.deleteNode.activeTree).deleteNode(del_node);
   }
 
   if (_.isString(data.dashboardUrl)) {
@@ -177,7 +206,7 @@ ManageIQ.explorer.processReplaceRightCell = function(data) {
       }
     });
 
-  $('#main_div').scrollTop(0);
+  ManageIQ.explorer.scrollTop(data);
 
   if (_.isString(data.rightCellText)) {
     $('h1#explorer_title > span#explorer_title_text')
@@ -199,7 +228,8 @@ ManageIQ.explorer.processReplaceRightCell = function(data) {
   ManageIQ.record = data.record;
 
   if (!_.isUndefined(data.activateNode)) {
-    miqDynatreeActivateNodeSilently(data.activateNode.activeTree, data.activateNode.osf);
+    miqExpandParentNodes(data.activateNode.activeTree, data.activateNode.osf);
+    miqTreeActivateNodeSilently(data.activateNode.activeTree, data.activateNode.osf);
   }
 
   if (_.isObject(data.lockTrees)) {
@@ -217,16 +247,14 @@ ManageIQ.explorer.processReplaceRightCell = function(data) {
   if (data.resetOneTrans) { ManageIQ.oneTransition.oneTrans = 0; }
   if (data.oneTransIE) { ManageIQ.oneTransition.IEButtonPressed = true; }
 
-  if (_.isString(data.focus)) {
-    var element = $('#' + data.focus);
-    if ( element.length ) element.focus();
-  }
+  ManageIQ.explorer.focus(data);
 
   if (!_.isUndefined(data.clearSearch)) {
     ManageIQ.explorer.clearSearchToggle(data.clearSearch);
   }
 
   miqInitMainContent();
+  miqInitAccordions();
 
   if (data.hideModal) { $('#quicksearchbox').modal('hide'); }
   if (data.initAccords) { miqInitAccordions(); }

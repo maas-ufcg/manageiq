@@ -31,10 +31,7 @@ class VmOrTemplate < ApplicationRecord
   include TenancyMixin
 
   include AvailabilityMixin
-
-  supports_not :retire
-  supports_not :associate_floating_ip
-  supports_not :disassociate_floating_ip
+  include ManageIQ::Providers::Inflector::Methods
 
   has_many :ems_custom_attributes, -> { where(:source => 'VC') }, :as => :resource, :dependent => :destroy,
            :class_name => "CustomAttribute"
@@ -55,6 +52,7 @@ class VmOrTemplate < ApplicationRecord
   }
 
   POWER_OPS = %w(start stop suspend reset shutdown_guest standby_guest reboot_guest)
+  REMOTE_REGION_TASKS = POWER_OPS + %w(retire_now)
 
   validates_presence_of     :name, :location
   validates                 :vendor, :inclusion => {:in => VENDOR_TYPES.keys}
@@ -133,8 +131,6 @@ class VmOrTemplate < ApplicationRecord
 
   acts_as_miq_taggable
 
-  supports_not :resize
-
   virtual_column :is_evm_appliance,                     :type => :boolean,    :uses => :miq_server
   virtual_column :os_image_name,                        :type => :string,     :uses => [:operating_system, :hardware]
   virtual_column :platform,                             :type => :string,     :uses => [:operating_system, :hardware]
@@ -186,6 +182,7 @@ class VmOrTemplate < ApplicationRecord
   virtual_delegate :name, :to => :ems_cluster, :prefix => true, :allow_nil => true
   virtual_delegate :vmm_product, :to => :host, :prefix => :v_host, :allow_nil => true
   virtual_delegate :v_pct_free_disk_space, :v_pct_used_disk_space, :to => :hardware, :allow_nil => true
+  delegate :connect_lans, :disconnect_lans, :to => :hardware, :allow_nil => true
 
   before_validation :set_tenant_from_group
 
@@ -353,7 +350,7 @@ class VmOrTemplate < ApplicationRecord
       data  = event.attributes["full_data"]
       prevented = data.fetch_path(:policy, :prevented) if data
     end
-    prevented ? _log.info("#{event.attributes["message"]}") : send(*action)
+    prevented ? _log.info(event.attributes["message"].to_s) : send(*action)
   end
 
   def enforce_policy(event, inputs = {}, options = {})
@@ -473,41 +470,12 @@ class VmOrTemplate < ApplicationRecord
     )
   end
 
-  def self.invoke_tasks_remote(options)
-    ids_by_region = options[:ids].group_by { |id| ApplicationRecord.id_to_region(id.to_i) }
-    ids_by_region.each do |region, ids|
-      remote_options = options.merge(:ids => ids)
-      hostname = MiqRegion.find_by_region(region).remote_ws_address
-      if hostname.nil?
-        $log.error("An error occurred while invoking remote tasks...The remote region [#{region}] does not have a web service address.")
-        next
-      end
-
-      begin
-        raise _("SOAP services are no longer supported. Remote server operations are dependent on a REST client library.")
-        # client = VmdbwsClient.new(hostname)  FIXME: Replace with REST client library
-        client.vm_invoke_tasks(remote_options)
-      rescue => err
-        # Handle specific error case, until we can figure out how it occurs
-        if err.class == ArgumentError && err.message == "cannot interpret as DNS name: nil"
-          $log.error("An error occurred while invoking remote tasks...")
-          $log.log_backtrace(err)
-          next
-        end
-
-        $log.error("An error occurred while invoking remote tasks...Requeueing for 1 minute from now.")
-        $log.log_backtrace(err)
-        MiqQueue.put(
-          :class_name  => base_class.name,
-          :method_name => 'invoke_tasks_remote',
-          :args        => [remote_options],
-          :deliver_on  => Time.now.utc + 1.minute
-        )
-        next
-      end
-
-      msg = "'#{options[:task]}' successfully initiated for remote VMs: #{ids.sort.inspect}"
-      task_audit_event(:success, options, :message => msg)
+  def self.action_for_task(task)
+    case task
+    when "retire_now"
+      "retire"
+    else
+      task
     end
   end
 
@@ -657,7 +625,6 @@ class VmOrTemplate < ApplicationRecord
                     # local
                     else
                       raise _("path, '%{path}', is malformed") % {:path => path}
-                      path
                     end
     return storage_name, (relative_path.empty? ? "/" : relative_path)
   end
@@ -734,29 +701,6 @@ class VmOrTemplate < ApplicationRecord
     end
   end
 
-  def connect_lans(lans)
-    unless lans.blank? || hardware.nil?
-      hardware.nics.each do |n|
-        # TODO: Use a different field here
-        #   model is temporarily being used here to transfer the name of the
-        #   lan to which this nic is connected.  If model ends up being an
-        #   otherwise used field, this will need to change
-        n.lan = lans.find { |l| l.name == n.model }
-        n.model = nil
-        n.save
-      end
-    end
-  end
-
-  def disconnect_lans
-    unless hardware.nil?
-      hardware.nics.each do |n|
-        n.lan = nil
-        n.save
-      end
-    end
-  end
-
   def connect_storage(s)
     unless storage == s
       _log.debug "Connecting Vm [#{name}] id [#{id}] to #{ui_lookup(:table => "storages")} [#{s.name}] id [#{s.id}]"
@@ -809,9 +753,9 @@ class VmOrTemplate < ApplicationRecord
     parent_blue_folders.any? { |f| f == folder }
   end
 
-  def parent_blue_folder_path
+  def parent_blue_folder_path(*args)
     f = parent_blue_folder
-    f.nil? ? "" : f.folder_path
+    f.nil? ? "" : f.folder_path(*args)
   end
   alias_method :owning_blue_folder_path, :parent_blue_folder_path
 
@@ -827,9 +771,9 @@ class VmOrTemplate < ApplicationRecord
   end
   alias_method :parent_yellow_folders, :parent_folders
 
-  def parent_folder_path
+  def parent_folder_path(*args)
     f = parent_folder
-    f.nil? ? "" : f.folder_path
+    f.nil? ? "" : f.folder_path(*args)
   end
   alias_method :owning_folder_path, :parent_folder_path
   alias_method :parent_yellow_folder_path, :parent_folder_path
@@ -1177,19 +1121,6 @@ class VmOrTemplate < ApplicationRecord
       raise _("%{table} failed last authentication check") % {:table => ui_lookup(:table => "ext_management_systems")}
     end
     EmsRefresh.refresh(self)
-  end
-
-  def refresh_on_reconfig
-    unless ext_management_system
-      raise _("No %{table} defined") % {:table => ui_lookup(:table => "ext_management_systems")}
-    end
-    unless ext_management_system.has_credentials?
-      raise _("No %{table} credentials defined") % {:table => ui_lookup(:table => "ext_management_systems")}
-    end
-    unless ext_management_system.authentication_status_ok?
-      raise _("%{table} failed last authentication check") % {:table => ui_lookup(:table => "ext_management_systems")}
-    end
-    EmsRefresh.reconfig_refresh(self)
   end
 
   def self.post_refresh_ems(ems_id, update_start_time)
@@ -1843,21 +1774,21 @@ class VmOrTemplate < ApplicationRecord
   end
 
   # Return all archived VMs
-  ARCHIVED_CONDITIONS = "vms.ems_id IS NULL AND vms.storage_id IS NULL"
+  ARCHIVED_CONDITIONS = "vms.ems_id IS NULL AND vms.storage_id IS NULL".freeze
   def self.all_archived
-    where(ARCHIVED_CONDITIONS).to_a
+    where(ARCHIVED_CONDITIONS)
   end
 
   # Return all orphaned VMs
-  ORPHANED_CONDITIONS = "vms.ems_id IS NULL AND vms.storage_id IS NOT NULL"
+  ORPHANED_CONDITIONS = "vms.ems_id IS NULL AND vms.storage_id IS NOT NULL".freeze
   def self.all_orphaned
-    where(ORPHANED_CONDITIONS).to_a
+    where(ORPHANED_CONDITIONS)
   end
 
   # where.not(ORPHANED_CONDITIONS).where.not(ARCHIVED_CONDITIONS)
   NOT_ARCHIVED_NOR_OPRHANED_CONDITIONS = "vms.ems_id IS NOT NULL".freeze
   def self.not_archived_nor_orphaned
-    where.not(:ems_id => null)
+    where.not(:ems_id => nil)
   end
 
   # Stop certain charts from showing unless the subclass allows

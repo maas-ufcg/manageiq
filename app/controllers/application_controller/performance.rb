@@ -144,7 +144,6 @@ module ApplicationController::Performance
                                        :action => "perf_top_chart",
                                        :bc     => params[:bc],
                                        :escape => false))
-      #     @spin_msg = "Generating chart data..."
       @ajax_action = "perf_top_chart"
       render :action => "show"
     end
@@ -249,7 +248,7 @@ module ApplicationController::Performance
     cmd, model, typ = params[:menu_click].split("_").first.split("-")
 
     # Swap in 'Instances' for 'VMs' in AZ breadcrumbs (poor man's cloud/infra split hack)
-    bc_model = request.parameters['controller'] == 'availability_zone' && model == 'VMs' ? 'Instances' : model
+    bc_model = ['availability_zone', 'host_aggregate'].include?(request.parameters['controller']) && model == 'VMs' ? 'Instances' : model
 
     report = @sb[:chart_reports].kind_of?(Array) ? @sb[:chart_reports][chart_idx] : @sb[:chart_reports]
     data_row = report.table.data[data_idx]
@@ -425,8 +424,7 @@ module ApplicationController::Performance
       @record = identify_tl_or_perf_record
       @perf_record = @record.kind_of?(MiqServer) ? @record.vm : @record # Use related server vm record
       @perf_options[:typ] = "Daily"
-
-      perf_set_or_fix_dates(@perf_options)  unless params[:task_id] # Set dates if first time thru
+      perf_set_or_fix_dates(@perf_options, false)  unless params[:task_id] # Set dates if first time thru
       perf_gen_data
       return unless @charts        # Return if no charts got created (first time thru async rpt gen)
 
@@ -528,22 +526,14 @@ module ApplicationController::Performance
     end
 
     msg ? add_flash(msg, :warning) : add_flash(_("Unknown error has occurred"), :error)
-    render :update do |page|
-      page << javascript_prologue
-      page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-      page << "miqSparkle(false);"
-    end
+    javascript_flash(:spinner_off => true)
   end
 
   # Send error message if record is found and authorized, else return the record
   def perf_menu_record_valid(model, id, resource_name)
     rec = find_by_model_and_id_check_rbac(model, id, resource_name)
     unless @flash_array.blank?
-      render :update do |page|
-        page << javascript_prologue
-        page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-        page << "miqSparkle(false);"
-      end
+      javascript_flash(:spinner_off => true)
       return false
     end
     rec  # Record is found and authorized
@@ -576,7 +566,7 @@ module ApplicationController::Performance
       @perf_options[:model] = @perf_record.kind_of?(MiqCimInstance) ? @perf_record.class.to_s : @perf_record.class.base_class.to_s
     end
     @perf_options[:rt_minutes] ||= 15.minutes
-    @perf_options[:cats] ||= perf_build_cats(@perf_options[:model]) if ["EmsCluster", "Host", "Storage", "AvailabilityZone"].include?(@perf_options[:model])
+    @perf_options[:cats] ||= perf_build_cats(@perf_options[:model]) if ["EmsCluster", "Host", "Storage", "AvailabilityZone", "HostAggregate"].include?(@perf_options[:model])
     if ["Storage"].include?(@perf_options[:model]) && @perf_options[:typ] == "Daily"
       @perf_options[:vmtypes] ||= [["<All>", "<All>"],
                                    ["Managed/Registered", "registered"],
@@ -696,8 +686,8 @@ module ApplicationController::Performance
                              from_dt,
                              to_dt,
                              interval_type]
-      elsif %w(MiddlewareServer MiddlewareDatasource).include?(@perf_record.class.name.demodulize)
-        rpt = perf_get_chart_rpt("vim_perf_#{interval_type}_#{@perf_record.class.name.demodulize.underscore}")
+      elsif %w(MiddlewareServer MiddlewareDatasource MiddlewareMessaging).include?(@perf_record.class.name.demodulize)
+        rpt = perf_get_chart_rpt("vim_perf_#{interval_type}_#{@perf_record.chart_report_name}")
         rpt.where_clause = ["resource_type = ? and resource_id = ? and timestamp >= ? and timestamp <= ? " \
                             "and capture_interval_name = ?",
                             @perf_options[:model],
@@ -706,7 +696,7 @@ module ApplicationController::Performance
                             to_dt,
                             interval_type]
       else  # Doing VIM performance on a normal CI
-        suffix = @perf_record.kind_of?(AvailabilityZone) ? "_cloud" : "" # Get special cloud version with 'Instances' headers
+        suffix = (@perf_record.kind_of?(AvailabilityZone) || @perf_record.kind_of?(HostAggregate)) ? "_cloud" : "" # Get special cloud version with 'Instances' headers
         rpt = perf_get_chart_rpt("vim_perf_#{interval_type}#{suffix}")
         rpt.where_clause =  ["resource_type = ? and resource_id = ? and timestamp >= ? and timestamp <= ? and capture_interval_name = ?",
                              @perf_options[:model],
@@ -721,8 +711,9 @@ module ApplicationController::Performance
     when "realtime"
       f, to_dt = @perf_record.first_and_last_capture("realtime")
       from_dt = to_dt.nil? ? nil : to_dt - @perf_options[:rt_minutes]
-      suffix = if %w(MiddlewareServer MiddlewareDatasource).include?(@perf_record.class.name.demodulize)
-                 "_#{@perf_record.class.name.demodulize.underscore}"
+      suffix = if %w(MiddlewareServer MiddlewareDatasource MiddlewareMessaging)
+                  .include?(@perf_record.class.name.demodulize)
+                 "_#{@perf_record.chart_report_name}"
                else
                  ""
                end
@@ -743,12 +734,6 @@ module ApplicationController::Performance
                            from_dt,
                            to_dt,
                            "realtime"]
-
-      #### To do - Uncomment to ask for long term averages
-      #       rpt.db_options ||= Hash.new
-      #       rpt.db_options[:long_term_averages] = Hash.new  # Request that averages get computed
-      ####
-
     end
     rpts = [rpt]
     if perf_parent?                               # Build the parent report, if asked for
@@ -767,18 +752,6 @@ module ApplicationController::Performance
                              to_dt]
       rpts.push(c_rpt)
     end
-
-    ### TODO: Uncomment following block for performance.  Need to fix, was causing second parent chart to have no cols.
-    # If only looking at 1 chart, trim report columns for less daily rollups
-    #     if @perf_options[:index] && @perf_options[:typ] = "Daily"
-    #       chart_layouts = perf_get_chart_layout("daily_perf_charts")
-    #       chart = chart_layouts[@perf_options[:model].to_sym][@perf_options[:index].to_i]
-    #       perf_trim_report_cols(rpt, chart)
-    #       if perf_parent?                               # Trim the parent report, if asked for
-    #         chart = chart_layouts[("Parent-" + @perf_options[:parent]).to_sym][@perf_options[:index].to_i]
-    #         perf_trim_report_cols(p_rpt, chart)
-    #       end
-    #     end
 
     initiate_wait_for_task(:task_id => MiqReport.async_generate_tables(:reports => rpts, :userid => session[:userid]))
   end
@@ -1140,8 +1113,7 @@ module ApplicationController::Performance
       chart_layouts[@sb[:util][:options][:model].to_sym].each_with_index do |chart, _idx|
         tag_class = @sb[:util][:options][:tag].split("/").first if @sb[:util][:options][:tag]
         if chart[:type] == "None" || # No chart is available for this slot
-           (@sb[:util][:options][:tag] && chart[:allowed_child_tag] && !chart[:allowed_child_tag].include?(tag_class)) # Tag not allowed - Replace following line in sprint 69
-          #           (@sb[:util][:options][:tag] && chart[:allowed_child_tag] && !@sb[:util][:options][:tag].starts_with?(chart[:allowed_child_tag]))  # Tag not allowed
+           (@sb[:util][:options][:tag] && chart[:allowed_child_tag] && !chart[:allowed_child_tag].include?(tag_class)) # Tag not allowed
           chart_data.push(nil)              # Push a placeholder onto the chart data array
         else
           perf_remove_chart_cols(chart)
@@ -1481,7 +1453,7 @@ module ApplicationController::Performance
     cats.delete_if { |c| c.read_only? || c.entries.length == 0 }                    # Remove categories that are read only or have no entries
     ret_cats = {"<None>" => "<None>"}                                               # Classifications hash for chooser
     case model
-    when "Host", "Storage", "AvailabilityZone"
+    when "Host", "Storage", "AvailabilityZone", "HostAggregate"
       cats.each { |c| ret_cats["Vm:" + c.name] = "VM " + c.description }            # Add VM categories to the hash
     when "EmsCluster"
       cats.each { |c| ret_cats["Host:" + c.name] = "Host " + c.description }        # Add VM categories to the hash

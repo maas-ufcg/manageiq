@@ -135,9 +135,9 @@ class MiqTaskController < ApplicationController
                          :message      => _("Delete started for record ids: %{id}") % {:id => job_ids.inspect},
                          :target_class => db_class.base_class.name)
       if @flash_array.nil?
-        add_flash(n_("Delete initiated for %{count} Task from the CFME Database",
-                     "Delete initiated for %{count} Tasks from the CFME Database",
-                     job_ids.length) % {:count => job_ids.length})
+        add_flash(n_("Delete initiated for %{count} Task from the %{product} Database",
+                     "Delete initiated for %{count} Tasks from the %{product} Database",
+                     job_ids.length) % {:count => job_ids.length, :product => I18n.t('product.name')})
       end
     end
     jobs
@@ -160,9 +160,9 @@ class MiqTaskController < ApplicationController
                          :message      => _("Delete started for record ids: %{id}") % {:id => job_ids.inspect},
                          :target_class => db_class.base_class.name)
       if @flash_array.nil?
-        add_flash(n_("Delete initiated for %{count} Task from the CFME Database",
-                     "Delete initiated for %{count} Tasks from the CFME Database",
-                     job_ids.length) % {:count => job_ids.length})
+        add_flash(n_("Delete initiated for %{count} Task from the %{product} Database",
+                     "Delete initiated for %{count} Tasks from the %{product} Database",
+                     job_ids.length) % {:count => job_ids.length, :product => I18n.t('product.name')})
       end
     end
     jobs
@@ -184,9 +184,9 @@ class MiqTaskController < ApplicationController
                          :event        => "Delete older tasks",
                          :message      => message,
                          :target_class => db_class.base_class.name)
-      add_flash(n_("Delete all older Tasks initiated for %{count} Task from the CFME Database",
-                   "Delete all older Tasks initiated for %{count} Tasks from the CFME Database",
-                   jobid.length) % {:count => jobid.length})
+      add_flash(n_("Delete all older Tasks initiated for %{count} Task from the %{product} Database",
+                   "Delete all older Tasks initiated for %{count} Tasks from the %{product} Database",
+                   jobid.length) % {:count => jobid.length, :product => I18n.t('product.name')})
     else
       add_flash(_("The selected job no longer exists, Delete all older Tasks was not completed"), :warning)
     end
@@ -207,7 +207,7 @@ class MiqTaskController < ApplicationController
       end
       begin
         job.send(task.to_sym) if job.respond_to?(task)    # Run the task
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("%{model} \"%{name}\": Error during '%{task}': %{message}") %
                     {:model   => ui_lookup(:model => "MiqTask"),
                      :name    => job_name,
@@ -347,7 +347,7 @@ class MiqTaskController < ApplicationController
 
     cond = add_to_condition(cond, *build_query_for_state(opts)) if opts[:state_choice] != "all"
 
-    cond[0] = "#{cond[0].join(" AND ")}"
+    cond[0] = cond[0].join(" AND ")
     cond.flatten
   end
 

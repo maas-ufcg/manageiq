@@ -1,6 +1,6 @@
 module Api
   class TagsController < BaseController
-    def create_resource_tags(type, _id, data)
+    def create_resource(type, _id, data)
       assert_id_not_specified(data, type)
       category_data = data.delete("category") { {} }
       category = fetch_category(category_data)
@@ -10,14 +10,14 @@ module Api
       end
       begin
         entry = category.add_entry(data)
-        raise BadRequestError, "#{entry.errors.full_messages.join(', ')}" unless entry.valid?
+        raise BadRequestError, entry.errors.full_messages.join(', ') unless entry.valid?
         entry.tag
       rescue => err
         raise BadRequestError, "Could not create a new tag - #{err}"
       end
     end
 
-    def edit_resource_tags(type, id, data)
+    def edit_resource(type, id, data)
       klass = collection_class(type)
       tag = resource_search(id, type, klass)
       entry = Classification.find_by_tag_id(tag.id)
@@ -30,7 +30,7 @@ module Api
       entry.tag
     end
 
-    def delete_resource_tags(_type, id, _data = {})
+    def delete_resource(_type, id, _data = {})
       destroy_tag_and_classification(id)
       action_result(true, "tags id: #{id} deleting")
     rescue ActiveRecord::RecordNotFound
@@ -42,7 +42,8 @@ module Api
     private
 
     def fetch_category(data)
-      category_id = parse_id(data, :categories) || parse_by_attr(data, :categories, %w(name))
+      category_id = parse_id(data, :categories)
+      category_id ||= collection_class(:categories).find_by_name(data["name"]).try(:id) if data["name"]
       unless category_id
         raise BadRequestError, "Category id, href or name needs to be specified for creating a new tag resource"
       end

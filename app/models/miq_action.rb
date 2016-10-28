@@ -257,7 +257,7 @@ class MiqAction < ApplicationRecord
         # ${Object.method}
         if what == "object"
           if method == "type"
-            subst = "#{rec.class}"
+            subst = rec.class.to_s
           elsif method == "ems" && rec.respond_to?(:ext_management_system)
             ems = rec.ext_management_system
             subst = "vCenter #{ems.hostname}/#{ems.ipaddress}" unless ems.nil?
@@ -573,7 +573,7 @@ class MiqAction < ApplicationRecord
     target = inputs[:synchronous] ? VmOrTemplate : rec.class
     invoke_or_queue(
       inputs[:synchronous], __method__, "ems_operations", rec.my_zone, target, 'retire',
-      [[rec], :date => Time.now.utc - 1.day],
+      [[rec], :date => Time.zone.now - 1.day],
       "VM Retire for VM [#{rec.name}]")
   end
 
@@ -713,8 +713,7 @@ class MiqAction < ApplicationRecord
       return
     end
 
-    # This event does not yes exists but better be on the safe side
-    if inputs[:event].name == "request_container_image_scan"
+    if inputs[:event].name == "request_containerimage_scan"
       MiqPolicy.logger.warn("MIQ(#{__method__}): Invoking action [#{action.description}] for event"\
                             " [#{inputs[:event].description}] would cause infinite loop, skipping")
       return
@@ -796,15 +795,16 @@ class MiqAction < ApplicationRecord
       return
     end
 
-    task_mor = inputs[:ems_event].full_data['info']['task']
+    source_event = inputs[:source_event]
+    task_mor = source_event.full_data.try(:fetch_path, 'info', 'task')
     unless task_mor
       MiqPolicy.logger.warn("MIQ(action_cancel_task): Event record does not have a task reference, no action will be taken")
       return
     end
 
-    MiqPolicy.logger.info("MIQ(action_cancel_task): Now executing Cancel of task [#{inputs[:ems_event].event_type}] on VM [#{inputs[:ems_event].vm_name}]")
-    ems = ExtManagementSystem.find_by_id(inputs[:ems_event].ems_id)
-    raise _("unable to find vCenter with id [%{id}]") % {:id => inputs[:ems_event].ems_id} if ems.nil?
+    MiqPolicy.logger.info("MIQ(action_cancel_task): Now executing Cancel of task [#{source_event.event_type}] on VM [#{source_event.vm_name}]")
+    ems = ExtManagementSystem.find_by_id(source_event.ems_id)
+    raise _("unable to find vCenter with id [%{id}]") % {:id => source_event.ems_id} if ems.nil?
 
     vim = ems.connect
     vim.cancelTask(task_mor)
@@ -814,7 +814,7 @@ class MiqAction < ApplicationRecord
     ae_hash = action.options[:ae_hash] || {}
     automate_attrs = ae_hash.reject { |key, _value| MiqAeEngine::DEFAULT_ATTRIBUTES.include?(key) }
     automate_attrs[:request] = action.options[:ae_request]
-    MiqAeEngine.set_automation_attributes_from_objects([inputs[:policy], inputs[:ems_event]], automate_attrs)
+    MiqAeEngine.set_automation_attributes_from_objects([inputs[:policy], inputs[:source_event]], automate_attrs)
 
     user = rec.tenant_identity
     unless user

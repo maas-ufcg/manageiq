@@ -21,7 +21,7 @@ shared_examples "custom_report_with_custom_attributes" do |base_report, custom_a
       :rpt_type  => "Custom",
       :db        => base_report == "Host" ? "Host" : "ManageIQ::Providers::InfraManager::Vm",
       :cols      => %w(name),
-      :include   => {"#{custom_attributes_field}" => {"columns" => %w(name value)}},
+      :include   => {custom_attributes_field.to_s => {"columns" => %w(name value)}},
       :col_order => %w(miq_custom_attributes.name miq_custom_attributes.value name),
       :headers   => ["EVM Custom Attribute Name", "EVM Custom Attribute Value", "Name"],
       :order     => "Ascending",
@@ -758,6 +758,30 @@ describe MiqReport do
         :col_order => %w(name hostname smart),
       )
       expect(report.sort_col).to eq(0)
+    end
+  end
+
+  describe ".cols" do
+    it "loads given value" do
+      report = MiqReport.new(
+        :cols      => %w(name)
+      )
+      expect(report.cols).to eq(%w(name))
+    end
+
+    it "falls back to col_order" do
+      report = MiqReport.new(
+        :col_order => %w(miq_custom_attributes.name miq_custom_attributes.value name)
+      )
+      expect(report.cols).to eq(%w(name))
+    end
+
+    it "allows manipulation" do
+      report = MiqReport.new(
+        :col_order => %w(miq_custom_attributes.name miq_custom_attributes.value name),
+      )
+      report.cols << "name2"
+      expect(report.cols).to eq(%w(name name2))
     end
   end
 end

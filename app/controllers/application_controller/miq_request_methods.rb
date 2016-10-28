@@ -548,7 +548,7 @@ module ApplicationController::MiqRequestMethods
     @edit[:wf].get_dialog_order.each do |d|
       @edit[:wf].get_all_fields(d, false).each do |_f, field|
         unless field[:error].blank?
-          @error_div ||= "#{d}"
+          @error_div ||= d.to_s
           add_flash(field[:error], :error)
         end
       end
@@ -560,7 +560,7 @@ module ApplicationController::MiqRequestMethods
       @edit[:wf].get_all_fields(d, false).each do |_f, field|
         @edit[:wf].validate(@edit[:new])
         unless field[:error].nil?
-          @error_div ||= "#{d}"
+          @error_div ||= d.to_s
           add_flash(field[:error], :error)
         end
       end
@@ -727,7 +727,7 @@ module ApplicationController::MiqRequestMethods
         end
         begin
           @edit[:wf].refresh_field_values(@edit[:new])
-        rescue StandardError => bang
+        rescue => bang
           add_flash(bang.message, :error)
           @edit[:new][f.to_sym] = val                                             # Save value
           return false                                                            # No need to refresh dialog divs
@@ -748,8 +748,8 @@ module ApplicationController::MiqRequestMethods
     if @options[:schedule_time]
       @options[:schedule_time] = format_timezone(@options[:schedule_time], Time.zone, "raw")
       @options[:start_date] = "#{@options[:schedule_time].month}/#{@options[:schedule_time].day}/#{@options[:schedule_time].year}"  # Set the start date
-      @options[:start_hour] = "#{@options[:schedule_time].hour}"
-      @options[:start_min] = "#{@options[:schedule_time].min}"
+      @options[:start_hour] = @options[:schedule_time].hour.to_s
+      @options[:start_min] = @options[:schedule_time].min.to_s
     end
     drop_breadcrumb(:name => @miq_request.description.to_s.split(' submitted')[0], :url => "/miq_request/show/#{@miq_request.id}")
     if @miq_request.workflow_class
@@ -812,8 +812,8 @@ module ApplicationController::MiqRequestMethods
         @edit[:new][:schedule_time] = format_timezone(@edit[:new][:schedule_time], Time.zone, "raw")
         @edit[:new][:start_date] = "#{@edit[:new][:schedule_time].month}/#{@edit[:new][:schedule_time].day}/#{@edit[:new][:schedule_time].year}" # Set the start date
         if params[:id]
-          @edit[:new][:start_hour] = "#{@edit[:new][:schedule_time].hour}"
-          @edit[:new][:start_min] = "#{@edit[:new][:schedule_time].min}"
+          @edit[:new][:start_hour] = @edit[:new][:schedule_time].hour.to_s
+          @edit[:new][:start_min] = @edit[:new][:schedule_time].min.to_s
         else
           @edit[:new][:start_hour] = "00"
           @edit[:new][:start_min] = "00"
@@ -979,9 +979,7 @@ module ApplicationController::MiqRequestMethods
         if ldap_ous == ou[1][:ou]
           # expand selected nodes parents when editing existing record
           @expand_parent_nodes = id
-          temp[:addClass] = "cfme-blue-bold-node"
-        else
-          temp[:addClass] = "cfme-no-cursor-node"
+          temp[:highlighted] = true
         end
         @ou_kids = []
         ou[1].each do |lvl1|
@@ -999,7 +997,7 @@ module ApplicationController::MiqRequestMethods
       end
     end
     unless all_dcs.blank?
-      @ldap_ous_tree = all_dcs.to_json  # Add ci node array to root of tree
+      @ldap_ous_tree = TreeBuilder.convert_bs_tree(all_dcs).to_json # Add ci node array to root of tree
     else
       @ldap_ous_tree = nil
     end
@@ -1017,10 +1015,8 @@ module ApplicationController::MiqRequestMethods
     }
 
     if ldap_ous == node[1][:ou]
-      kids[:addClass] = "cfme-blue-bold-node"
+      temp[:highlighted] = true
       @expand_parent_nodes = id
-    else
-      kids[:addClass] = "cfme-no-cursor-node"
     end
 
     ou_kids = []
@@ -1067,7 +1063,7 @@ module ApplicationController::MiqRequestMethods
           temp = {}
           temp[:key] = c[0].to_s
           # only add cfme_parent_key for single value tags, need to use in JS onclick handler
-          temp[:cfme_parent_key] = t[:id].to_s if t[:single_value]
+          temp[:selectable] = false
           temp[:title] = temp[:tooltip] = c[1][:description]
           temp[:addClass] = "cfme-no-cursor-node"
           temp[:icon] = child_icon
@@ -1099,7 +1095,7 @@ module ApplicationController::MiqRequestMethods
         all_tags.push(@ci_node) unless @ci_kids.blank?
       end
     end
-    @all_tags_tree = all_tags.to_json # Add ci node array to root of tree
+    @all_tags_tree = TreeBuilder.convert_bs_tree(all_tags).to_json # Add ci node array to root of tree
     session[:tree] = "all_tags"
     session[:tree_name] = "all_tags_tree"
   end

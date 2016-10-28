@@ -50,6 +50,7 @@
           = select_tag('provider_region',
                        options_for_select([["<#{_('Choose')}>", nil]] + regions, disabled: ["<#{_('Choose')}>", nil]),
                        "ng-model"                    => "emsCommonModel.provider_region",
+                       "ng-if"                       => "emsCommonModel.emstype == '#{name}'",
                        "ng-switch-when"              => name,
                        "required"                    => "",
                        "checkchange"                 => "",
@@ -81,10 +82,13 @@
                             "ng-model"                => "emsCommonModel.azure_tenant_id",
                             "required"                => "",
                             "checkchange"             => "",
+                            "is-uuid"                 => 4,
                             "prefix"                  => "default",
                             "reset-validation-status" => "default_auth_status"}
         %span.help-block{"ng-show" => "angularForm.azure_tenant_id.$error.required"}
           = _("Required")
+        %span.help-block{"ng-show" => "angularForm.azure_tenant_id.$error.isUuid"}
+          = _("Invalid input format, please enter a GUID")
 
     .form-group{"ng-class" => "{'has-error': angularForm.subscription.$invalid}", "ng-if" => "emsCommonModel.emstype != '' && emsCommonModel.emstype == 'azure'"}
       %label.col-md-2.control-label{"for" => "ems_subscription"}
@@ -96,7 +100,10 @@
                             "ng-model"                => "emsCommonModel.subscription",
                             "checkchange"             => "",
                             "prefix"                  => "default",
+                            "is-uuid"                 => 4,
                             "reset-validation-status" => "default_auth_status"}
+        %span.help-block{"ng-show" => "angularForm.subscription.$error.isUuid"}
+          = _("Invalid input format, please enter a GUID")
 
     .form-group{"ng-class" => "{'has-error': angularForm.api_version.$invalid}", "ng-if" => "emsCommonModel.emstype == 'openstack' || emsCommonModel.emstype == 'openstack_infra'"}
       %label.col-md-2.control-label{"for" => "ems_api_version"}
@@ -175,6 +182,17 @@
                        "checkchange"                 => "",
                        "required"                    => "",
                        "selectpicker-for-select-tag" => "")
+    .form-group{"ng-if" => "emsCommonModel.emstype == 'openstack'"}
+      %label.control-label.col-md-2{"for" => "ems_tenant_mapping_enabled"}
+        = _('Tenant Mapping Enabled')
+      .col-md-8
+        %input{"bs-switch"   => "",
+               :data         => {:on_text => 'Yes', :off_text => 'No', :size => 'mini'},
+               "type"        => "checkbox",
+               "id"          => "ems_tenant_mapping_enabled",
+               "name"        => "tenant_mapping_enabled",
+               "checkchange" => "true",
+               "ng-model"    => "emsCommonModel.tenant_mapping_enabled"}
 
     .form-group{"ng-class" => "{'has-error': angularForm.host_default_vnc_port_start.$invalid}", "ng-if" => "emsCommonModel.emstype_vm"}
       %label.col-md-2.control-label{"for" => "ems_vnc_start_port"}
@@ -219,6 +237,7 @@
                               :validate_url           => @ems.id ? "update" : "create",
                               :id                     => @ems.id || "new",
                               :basic_info_needed      => true,
+                              :guid_regex             => true,
                               :userid_label           => _("Client ID"),
                               :password_label         => _("Client Key"),
                               :verify_label           => _("Confirm Client Key"),

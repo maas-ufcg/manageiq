@@ -72,7 +72,7 @@ module OpsController::Settings::Tags
                                           :perf_by_tag  => @edit[:new][:perf_by_tag],
                                           :example_text => @edit[:new][:example_text],
                                           :show         => @edit[:new][:show])
-        rescue StandardError => bang
+        rescue => bang
           add_flash(_("Error during 'add': %{message}") % {:message => bang.message}, :error)
           javascript_flash
         else
@@ -88,7 +88,7 @@ module OpsController::Settings::Tags
         category_set_record_vars(update_category)
         begin
           update_category.save!
-        rescue StandardError => bang
+        rescue => bang
           update_category.errors.each do |field, msg|
             add_flash("#{field.to_s.capitalize} #{msg}", :error)
           end
@@ -190,11 +190,7 @@ module OpsController::Settings::Tags
     end
     unless entry.errors.empty?
       entry.errors.each { |field, msg| add_flash("#{field.to_s.capitalize} #{msg}", :error) }
-      render :update do |page|
-        page << javascript_prologue
-        page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-        page << javascript_focus('entry_name')
-      end
+      javascript_flash(:focus => 'entry_name')
       return
     end
     if session[:entry] == "new"
@@ -231,11 +227,7 @@ module OpsController::Settings::Tags
       end
     else
       entry.errors.each { |field, msg| add_flash("#{field.to_s.capitalize} #{msg}", :error) }
-      render :update do |page|
-        page << javascript_prologue
-        page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-        page << javascript_focus('entry_name')
-      end
+      javascript_flash(:focus => 'entry_name')
     end
   end
 

@@ -5,6 +5,7 @@ class ManageIQ::Providers::Openstack::CloudManager < ManageIQ::Providers::CloudM
   require_nested :CloudResourceQuota
   require_nested :CloudTenant
   require_nested :CloudVolume
+  require_nested :CloudVolumeBackup
   require_nested :CloudVolumeSnapshot
   require_nested :EventCatcher
   require_nested :EventParser
@@ -22,18 +23,60 @@ class ManageIQ::Providers::Openstack::CloudManager < ManageIQ::Providers::CloudM
   require_nested :Template
   require_nested :Vm
 
+  has_many :storage_managers,
+           :foreign_key => :parent_ems_id,
+           :class_name  => "ManageIQ::Providers::StorageManager",
+           :autosave    => true,
+           :dependent   => :destroy
+
+  include CinderManagerMixin
+  include SwiftManagerMixin
   include ManageIQ::Providers::Openstack::ManagerMixin
 
   supports :provisioning
+  supports :cloud_tenant_mapping do
+    if defined?(self.class.parent::CloudManager::CloudTenant) && !tenant_mapping_enabled?
+      unsupported_reason_add(:cloud_tenant_mapping, _("Tenant mapping is disabled on the Provider"))
+    elsif !defined?(self.class.parent::CloudManager::CloudTenant)
+      unsupported_reason_add(:cloud_tenant_mapping, _("Tenant mapping is supported only when CloudTenant exists "\
+                                                      "on the CloudManager"))
+    end
+  end
+  supports :cinder_service
+  supports :swift_service
 
-  before_validation :ensure_managers
+  before_validation :ensure_managers,
+                    :ensure_cinder_managers,
+                    :ensure_swift_managers
 
   def ensure_network_manager
     build_network_manager(:type => 'ManageIQ::Providers::Openstack::NetworkManager') unless network_manager
   end
 
+  def ensure_cinder_manager
+    return false if cinder_manager
+    build_cinder_manager(:type => 'ManageIQ::Providers::StorageManager::CinderManager')
+    true
+  end
+
+  def ensure_swift_manager
+    return false if swift_manager
+    build_swift_manager(:type => 'ManageIQ::Providers::StorageManager::SwiftManager')
+    true
+  end
+
   def supports_cloud_tenants?
     true
+  end
+
+  def cinder_service
+    vs = openstack_handle.detect_volume_service
+    vs.name == :cinder ? vs : nil
+  end
+
+  def swift_service
+    vs = openstack_handle.detect_storage_service
+    vs.name == :swift ? vs : nil
   end
 
   def self.ems_type
@@ -59,8 +102,10 @@ class ManageIQ::Providers::Openstack::CloudManager < ManageIQ::Providers::CloudM
     existing_providers = Endpoint.where(:hostname => hostname.downcase)
                                  .where.not(:resource_id => id).includes(:resource)
                                  .select do |endpoint|
-                                   endpoint.resource.uid_ems == keystone_v3_domain_id &&
-                                     endpoint.resource.provider_region == provider_region
+                                   unless endpoint.resource.nil?
+                                     endpoint.resource.uid_ems == keystone_v3_domain_id &&
+                                       endpoint.resource.provider_region == provider_region
+                                   end
                                  end
 
     errors.add(:hostname, "has already been taken") if existing_providers.any?
@@ -84,6 +129,14 @@ class ManageIQ::Providers::Openstack::CloudManager < ManageIQ::Providers::CloudM
 
   def supports_provider_id?
     true
+  end
+
+  def supports_cinder_service?
+    openstack_handle.detect_volume_service.name == :cinder
+  end
+
+  def supports_swift_service?
+    openstack_handle.detect_storage_service.name == :swift
   end
 
   def supports_authentication?(authtype)

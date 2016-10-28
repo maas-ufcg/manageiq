@@ -73,7 +73,7 @@ module OpsController::Settings::Upload
             imp = AssetTagImport.upload('VmOrTemplate', params[:upload][:file])
           end
         end
-      rescue StandardError => bang
+      rescue => bang
         msg = _("Error during 'upload': %{message}") % {:message => bang.message}
         err = true
       else
@@ -86,7 +86,7 @@ module OpsController::Settings::Upload
           msg = _("No valid import records were found, please upload another file")
           err = true
         else
-          msg = _("Press the Apply button to import the good records into the CFME database")
+          msg = _("Press the Apply button to import the good records into the %{product} database") % {:product => I18n.t('product.name')}
           err = false
           @sb[:good] = imp.stats[:good]
           @sb[:imports] = imp
@@ -99,6 +99,4 @@ module OpsController::Settings::Upload
     @sb[:show_button] = (@sb[:good] && @sb[:good] > 0)
     redirect_to :action => 'explorer', :flash_msg => msg, :flash_error => err, :no_refresh => true
   end
-
-  private
 end

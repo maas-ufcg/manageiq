@@ -41,7 +41,7 @@ class ApplicationHelper::ToolbarChooser
       'compare_view_tb'
     elsif @lastaction == "drift"
       'drift_view_tb'
-    elsif %w(ems_container).include?(@layout) && %w(main dashboard topology).include?(@display)
+    elsif %w(ems_container ems_infra).include?(@layout) && %w(main dashboard topology).include?(@display)
       'dashboard_summary_toggle_view_tb'
     elsif !%w(all_tasks all_ui_tasks timeline diagnostics my_tasks my_ui_tasks miq_server usage).include?(@layout) &&
           (!@layout.starts_with?("miq_request")) && !@treesize_buttons &&
@@ -101,6 +101,8 @@ class ApplicationHelper::ToolbarChooser
         end
       elsif @layout == "provider_foreman" && [:configuration_manager_providers_tree, :cs_filter_tree, :configuration_scripts_tree].include?(x_active_tree)
         return center_toolbar_filename_configuration_manager_providers
+      elsif [:infra_networking_tree].include?(x_active_tree)
+        return center_toolbar_filename_infra_networking
       else
         if x_active_tree == :ae_tree
           return center_toolbar_filename_automate
@@ -191,11 +193,11 @@ class ApplicationHelper::ToolbarChooser
       elsif @sb[:buttons_node]
         nodes = x_node.split('_')
         if nodes.length == 3 && nodes[2].split('-').first == "xx"
-          return "custom_button_set_center_tb"
+          return "catalogitem_button_set_center_tb"
         elsif nodes.length == 4 && nodes[3].split('-').first == "cbg"
-          return "custom_buttons_center_tb"
+          return "catalogitem_buttons_center_tb"
         else
-          return "custom_button_center_tb"
+          return "catalogitem_button_center_tb"
         end
       else
         return "servicetemplates_center_tb"
@@ -213,7 +215,7 @@ class ApplicationHelper::ToolbarChooser
         return "services_center_tb"
       end
     elsif x_active_tree == :ot_tree
-      if %w(root xx-otcfn xx-othot xx-otazu xx-otvnf).include?(x_node)
+      if %w(root xx-otcfn xx-othot xx-otazu xx-otvnf xx-otvap).include?(x_node)
         return "orchestration_templates_center_tb"
       else
         return "orchestration_template_center_tb"
@@ -437,7 +439,8 @@ class ApplicationHelper::ToolbarChooser
     # toolbar buttons on sub-screens
     to_display = %w(availability_zones cloud_networks cloud_object_store_containers cloud_subnets
                     cloud_tenants cloud_volumes ems_clusters flavors floating_ips hosts load_balancers
-                    network_ports network_routers orchestration_stacks resource_pools security_groups storages)
+                    network_ports network_routers orchestration_stacks resource_pools security_groups storages
+                    middleware_deployments middleware_datasources middleware_messagings middleware_servers)
     to_display_center = %w(stack_orchestration_template topology)
     if @lastaction == 'show' && (@view || @display != 'main') && !@layout.starts_with?("miq_request")
       if @display == "vms" || @display == "all_vms"
@@ -468,11 +471,11 @@ class ApplicationHelper::ToolbarChooser
     else
       # show_list and show screens
       unless @in_a_form
-        if %w(auth_key_pair_cloud availability_zone cloud_object_store_object cloud_object_store_container cloud_tenant
-              cloud_volume cloud_volume_snapshot configuration_job container_group container_node container_service ems_cloud ems_cluster
-              ems_container ems_middleware container_project container_route container_replicator container_image
+        if %w(auth_key_pair_cloud availability_zone host_aggregate cloud_object_store_object cloud_object_store_container cloud_tenant
+              cloud_volume cloud_volume_backup cloud_volume_snapshot configuration_job container_group container_node container_service
+              ems_cloud ems_cluster ems_container ems_middleware container_project container_route container_replicator container_image
               ems_network security_group floating_ip cloud_subnet network_router network_topology network_port cloud_network load_balancer
-              container_image_registry ems_infra flavor host container_build
+              container_image_registry ems_infra flavor host container_build infra_networking ems_storage
               ontap_file_share ontap_logical_disk container_topology middleware_topology middleware_server
               middleware_deployment middleware_datasource middleware_domain middleware_server_group middleware_messaging
               ontap_storage_system orchestration_stack resource_pool storage_manager
@@ -513,6 +516,11 @@ class ApplicationHelper::ToolbarChooser
     end
   end
 
+  def center_toolbar_filename_infra_networking
+    nodes = x_node.split('-')
+    infra_networking_tree_center_tb(nodes)
+  end
+
   def configuration_manager_providers_tree_center_tb(nodes)
     case nodes.first
     when "root"     then  "provider_foreman_center_tb"
@@ -540,6 +548,14 @@ class ApplicationHelper::ToolbarChooser
       "configuration_scripts_center_tb"
     else
       "configuration_script_center_tb"
+    end
+  end
+
+  def infra_networking_tree_center_tb(nodes)
+    if %w(root e h c).include?(nodes.first)
+      "infra_networkings_center_tb"
+    else
+      "infra_networking_center_tb"
     end
   end
 

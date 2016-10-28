@@ -11,7 +11,7 @@ module ManageIQ::Providers
       "cpu_usage_rate_average"     => {
         :counter_key           => "cpu_usage_rate_average",
         :instance              => "",
-        :capture_interval      => "#{INTERVAL}",
+        :capture_interval      => INTERVAL.to_s,
         :precision             => 1,
         :rollup                => "average",
         :unit_key              => "percent",
@@ -20,7 +20,7 @@ module ManageIQ::Providers
       "mem_usage_absolute_average" => {
         :counter_key           => "mem_usage_absolute_average",
         :instance              => "",
-        :capture_interval      => "#{INTERVAL}",
+        :capture_interval      => INTERVAL.to_s,
         :precision             => 1,
         :rollup                => "average",
         :unit_key              => "percent",
@@ -29,7 +29,7 @@ module ManageIQ::Providers
       "net_usage_rate_average" => {
         :counter_key           => "net_usage_rate_average",
         :instance              => "",
-        :capture_interval      => "#{INTERVAL}",
+        :capture_interval      => INTERVAL.to_s,
         :precision             => 2,
         :rollup                => "average",
         :unit_key              => "datagramspersecond",
@@ -57,7 +57,7 @@ module ManageIQ::Providers
       Benchmark.realtime_block(:collect_data) do
         begin
           context.collect_metrics
-        rescue StandardError => e
+        rescue => e
           _log.error("Hawkular metrics service unavailable: #{e.message}")
           ems.update_attributes(:last_metrics_error       => :unavailable,
                                 :last_metrics_update_date => Time.now.utc) if ems

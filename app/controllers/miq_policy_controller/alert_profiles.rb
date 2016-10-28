@@ -45,7 +45,7 @@ module MiqPolicyController::AlertProfiles
         begin
           alerts.each { |a| alert_profile.remove_member(MiqAlert.find(a)) unless mems.include?(a.id) }  # Remove any alerts no longer in the members list box
           mems.each_key { |m| alert_profile.add_member(MiqAlert.find(m)) unless current.include?(m) }   # Add any alerts not in the set
-        rescue StandardError => bang
+        rescue => bang
           add_flash(_("Error during 'Alert Profile %{params}': %{message}") %
             {:params => params[:button], :message => bang.message}, :error)
         end
@@ -199,9 +199,9 @@ module MiqPolicyController::AlertProfiles
           @assign[:new][:assign_to].ends_with?("-tags") ? "Tags" : ui_lookup(:tables => @assign[:new][:assign_to]),
           "folder_open.png",
           "",
-          :style_class  => "cfme-no-cursor-node",
-          :expand       => true,
-          :hideCheckbox => true
+          :cfme_no_click => true,
+          :expand        => true,
+          :hideCheckbox  => true
         )
         root_node[:children] = []
         @objects.sort_by { |o| (o.name.presence || o.description).downcase }.each do |o|
@@ -221,11 +221,12 @@ module MiqPolicyController::AlertProfiles
             choose_node_identifier(o),
             icon,
             "",
-            :select => @assign[:new][:objects].include?(o.id) # Check if tag is assigned
+            :cfme_no_click => true,
+            :select        => @assign[:new][:objects].include?(o.id) # Check if tag is assigned
           )
           root_node[:children].push(node)
         end
-        tree = root_node.to_json
+        tree = TreeBuilder.convert_bs_tree(root_node).to_json
       end
     end
     tree

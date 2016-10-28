@@ -8,7 +8,7 @@ class Dialog < ApplicationRecord
   validate :validate_children
 
   include DialogMixin
-  has_many   :resource_actions
+  has_many :resource_actions
   virtual_has_one :content, :class_name => "Hash"
 
   before_destroy          :reject_if_has_resource_actions
@@ -17,6 +17,10 @@ class Dialog < ApplicationRecord
   alias_attribute  :name, :label
 
   attr_accessor :target_resource
+
+  belongs_to :blueprint
+
+  delegate :readonly?, :to => :blueprint, :allow_nil => true
 
   def self.seed
     dialog_import_service = DialogImportService.new

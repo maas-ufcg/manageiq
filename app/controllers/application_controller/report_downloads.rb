@@ -62,16 +62,7 @@ module ApplicationController::ReportDownloads
     miq_task = MiqTask.find(params[:task_id])
     if !miq_task.results_ready?
       add_flash(_("Report generation returned: Status [%{status}] Message [%{message}]") % {:status => miq_task.status, :message => miq_task.message}, :error)
-      render :update do |page|
-        page << javascript_prologue
-        page << "if (miqDomElementExists('flash_msg_div_report_list')){"
-        page.replace("flash_msg_div_report_list", :partial => "layouts/flash_msg",
-                                                  :locals  => {:div_num => "_report_list"})
-        page << "} else {"
-        page.replace("flash_msg_div", :partial => "layouts/flash_msg")
-        page << "}"
-        page << "miqSparkle(false);"
-      end
+      javascript_flash(:spinner_off => true)
     else
       @sb[:render_rr_id] = miq_task.miq_report_result.id
       render :update do |page|
@@ -155,7 +146,7 @@ module ApplicationController::ReportDownloads
     @report_only = true
     @showtype    = @display
     run_time     = Time.now
-    klass        = ui_lookup(:model => "#{@record.class}")
+    klass        = ui_lookup(:model => @record.class.name)
 
     @options = {
       :page_layout => "portrait",

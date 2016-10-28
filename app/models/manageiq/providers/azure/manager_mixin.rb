@@ -6,7 +6,7 @@ module ManageIQ::Providers::Azure::ManagerMixin
 
     client_id  = options[:user] || authentication_userid(options[:auth_type])
     client_key = options[:pass] || authentication_password(options[:auth_type])
-    self.class.raw_connect(client_id, client_key, azure_tenant_id, subscription, options[:proxy_uri])
+    self.class.raw_connect(client_id, client_key, azure_tenant_id, subscription, options[:proxy_uri] || http_proxy_uri)
   end
 
   def verify_credentials(_auth_type = nil, options = {})
@@ -18,7 +18,7 @@ module ManageIQ::Providers::Azure::ManagerMixin
     raise MiqException::MiqInvalidCredentialsError, _("Incorrect credentials - check your Azure Client ID and Client Key")
   rescue MiqException::MiqInvalidCredentialsError
     raise # Raise before falling into catch-all block below
-  rescue StandardError => err
+  rescue => err
     _log.error("Error Class=#{err.class.name}, Message=#{err.message}")
     raise MiqException::MiqInvalidCredentialsError, _("Unexpected response returned from system: #{err.message}")
   else
@@ -27,7 +27,6 @@ module ManageIQ::Providers::Azure::ManagerMixin
 
   module ClassMethods
     def raw_connect(client_id, client_key, azure_tenant_id, subscription, proxy_uri = nil)
-      proxy_uri ||= VMDB::Util.http_proxy_uri
 
       require 'azure-armrest'
 

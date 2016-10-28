@@ -1,7 +1,6 @@
 describe Tenant do
   include_examples ".seed called multiple times"
 
-  let(:config) { {} }
   let(:tenant) { described_class.new(:domain => 'x.com', :parent => default_tenant) }
 
   let(:default_tenant) do
@@ -11,10 +10,6 @@ describe Tenant do
 
   let(:root_tenant) do
     Tenant.seed
-  end
-
-  before do
-    stub_server_configuration(config)
   end
 
   describe "#default_tenant" do
@@ -135,8 +130,6 @@ describe Tenant do
   end
 
   describe "#name" do
-    let(:config) { {:server => {:company => "settings"}} }
-
     it "has default name" do
       expect(tenant.name).to eq("My Company")
     end
@@ -169,6 +162,7 @@ describe Tenant do
 
     context "for root_tenants" do
       it "reads settings" do
+        stub_settings(:server => {:company => "settings"})
         expect(root_tenant.name).to eq("settings")
       end
 
@@ -206,13 +200,13 @@ describe Tenant do
     end
 
     it "has no logo for root_tenant" do
+      stub_settings(:server => {})
       expect(root_tenant.logo.url).to match(/missing/)
     end
 
     context "with server configurations" do
-      let(:config) { {:server => {:custom_logo => true}} }
-
       it "uses configurations value for root_tenant" do
+        stub_settings(:server => {:custom_logo => true})
         expect(root_tenant.logo.url).to eq("/uploads/custom_logo.png")
       end
 
@@ -253,9 +247,8 @@ describe Tenant do
       end
 
       context "#with custom_logo configuration" do
-        let(:config) { {:server => {:custom_logo => true}} }
-
         it "knows there is a logo from configuration" do
+          stub_settings(:server => {:custom_logo => true})
           expect(root_tenant).to be_logo
         end
 
@@ -318,9 +311,8 @@ describe Tenant do
     end
 
     context "with custom login logo configuration" do
-      let(:config) { {:server => {:custom_login_logo => true}} }
-
       it "has custom login logo" do
+        stub_settings(:server => {:custom_login_logo => true})
         expect(root_tenant.login_logo.url).to match(/custom_login_logo.png/)
       end
     end
@@ -348,6 +340,7 @@ describe Tenant do
 
   context "#validate_only_one_root" do
     it "allows child tenants" do
+      stub_settings(:server => {})
       root_tenant.children.create!
     end
 
@@ -377,10 +370,17 @@ describe Tenant do
   end
 
   context "#ensure_can_be_destroyed" do
+    let(:tenant)       { FactoryGirl.create(:tenant) }
+    let(:cloud_tenant) { FactoryGirl.create(:cloud_tenant) }
+
     it "wouldn't delete tenant with groups associated" do
-      tenant = FactoryGirl.create(:tenant)
       FactoryGirl.create(:miq_group, :tenant => tenant)
       expect { tenant.destroy! }.to raise_error(RuntimeError, /A tenant with groups.*cannot be deleted/)
+    end
+
+    it "does not delete tenant created by tenant mapping process" do
+      tenant.source = cloud_tenant
+      expect { tenant.destroy! }.to raise_error(RuntimeError, /A tenant created by tenant mapping cannot be deleted/)
     end
   end
 
@@ -454,6 +454,21 @@ describe Tenant do
         expect(root_tenant.visible_domains.collect(&:name)).to eq(%w(A B Redhat ManageIQ))
         dom4.reload
         expect(dom4.priority).to eq(2)
+      end
+
+      it "#reset_domain_priority_by_ordered_ids by subtenant" do
+        FactoryGirl.create(:miq_ae_system_domain, :name => 'ManageIQ', :priority => 0,
+                           :tenant_id => root_tenant.id)
+        FactoryGirl.create(:miq_ae_system_domain, :name => 'Redhat', :priority => 1,
+                           :tenant_id => root_tenant.id)
+        FactoryGirl.create(:miq_ae_domain, :name => 'T1_A', :tenant_id => t1.id)
+        FactoryGirl.create(:miq_ae_domain, :name => 'T1_B', :tenant_id => t1.id)
+        dom5 = FactoryGirl.create(:miq_ae_domain, :name => 'T1_1_A', :tenant_id => t1_1.id)
+        dom6 = FactoryGirl.create(:miq_ae_domain, :name => 'T1_1_B', :tenant_id => t1_1.id)
+        expect(t1_1.visible_domains.collect(&:name)).to eq(%w(T1_1_B T1_1_A T1_B T1_A Redhat ManageIQ))
+        ids = [dom6.id, dom5.id]
+        t1_1.reset_domain_priority_by_ordered_ids(ids)
+        expect(t1_1.visible_domains.collect(&:name)).to eq(%w(T1_1_A T1_1_B T1_B T1_A Redhat ManageIQ))
       end
     end
 
@@ -835,7 +850,9 @@ describe Tenant do
   end
 
   describe ".tenant_and_project_names" do
-    let(:config) { {:server => {:company => "root"}} }
+    before do
+      stub_settings(:server => {:company => "root"})
+    end
 
     # root
     #   ten1

@@ -123,7 +123,9 @@
  */
   ToolbarController.prototype.onViewClick = function(item, $event) {
     if (item.url.indexOf('/') === 0) {
-      var tail = (ManageIQ.record.recordId) ? ManageIQ.record.recordId : '';
+      var delimiter = (item.url === '/') ? '' : '/';
+      var tail = (ManageIQ.record.recordId) ? delimiter + ManageIQ.record.recordId : '';
+
       location.replace('/' + ManageIQ.controller + item.url + tail + item.url_parms);
     } else {
       miqToolbarOnClick.bind($event.delegateTarget)($event);
@@ -143,9 +145,12 @@
   }
 
   ToolbarController.prototype.onUpdateItem = function(updateData) {
-    _.find(_.flatten(this.toolbarItems), {id: updateData.update})[updateData.type] = updateData.value;
-    if(!this.$scope.$$phase) {
-      this.$scope.$digest();
+    var toolbarItem = _.find(_.flatten(this.toolbarItems), {id: updateData.update});
+    if (toolbarItem && toolbarItem.hasOwnProperty(updateData.type)) {
+      toolbarItem[updateData.type] = updateData.value;
+      if(!this.$scope.$$phase) {
+        this.$scope.$digest();
+      }
     }
   }
 

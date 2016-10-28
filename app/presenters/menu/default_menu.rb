@@ -48,17 +48,12 @@ module Menu
         Menu::Section.new(:clo, N_("Clouds"), 'fa fa-plus fa-2x', [
           Menu::Item.new('ems_cloud',           N_('Providers'),           'ems_cloud',                 {:feature => 'ems_cloud_show_list'},                     '/ems_cloud'),
           Menu::Item.new('availability_zone',   N_('Availability Zones'),  'availability_zone',         {:feature => 'availability_zone_show_list'},             '/availability_zone'),
+          Menu::Item.new('host_aggregate',      N_('Host Aggregates'),     'host_aggregate',            {:feature => 'host_aggregate_show_list'},                '/host_aggregate'),
           Menu::Item.new('cloud_tenant',        N_('Tenants'),             'cloud_tenant',              {:feature => 'cloud_tenant_show_list'},                  '/cloud_tenant'),
-          Menu::Item.new('cloud_volume',        N_('Volumes'),             'cloud_volume',              {:feature => 'cloud_volume_show_list'},                  '/cloud_volume'),
           Menu::Item.new('flavor',              N_('Flavors'),             'flavor',                    {:feature => 'flavor_show_list'},                        '/flavor'),
           Menu::Item.new('vm_cloud',            N_('Instances'),           'vm_cloud_explorer',         {:feature => 'vm_cloud_explorer', :any => true}, '/vm_cloud/explorer'),
           Menu::Item.new('orchestration_stack', N_('Stacks'),              'orchestration_stack',       {:feature => 'orchestration_stack_show_list'},           '/orchestration_stack'),
           Menu::Item.new('auth_key_pair_cloud', N_('Key Pairs'),           'auth_key_pair_cloud',       {:feature => 'auth_key_pair_cloud_show_list'},           '/auth_key_pair_cloud'),
-          Menu::Item.new('cloud_object_store_container',
-                         N_('Object Stores'),
-                         'cloud_object_store_container',
-                         {:feature => 'cloud_object_store_container_show_list'},
-                         '/cloud_object_store_container')
         ])
       end
 
@@ -67,18 +62,19 @@ module Menu
         clusters_name = hybrid_name(EmsCluster, N_("Clusters"), N_("Deployment Roles"), N_("Clusters / Deployment Roles"))
 
         Menu::Section.new(:inf, N_("Infrastructure"), 'fa fa-plus fa-2x', [
-          Menu::Item.new('ems_infra',        N_('Providers'),        'ems_infra',     {:feature => 'ems_infra_show_list'},     '/ems_infra'),
-          Menu::Item.new('ems_cluster',      clusters_name,          'ems_cluster',   {:feature => 'ems_cluster_show_list'},   '/ems_cluster'),
-          Menu::Item.new('host',             hosts_name,             'host',          {:feature => 'host_show_list'},          '/host'),
-          Menu::Item.new('vm_infra',         N_('Virtual Machines'), 'vm_infra_explorer',
-                         {:feature => 'vm_infra_explorer', :any => true},
-                         '/vm_infra/explorer'),
-          Menu::Item.new('resource_pool',    N_('Resource Pools'),   'resource_pool', {:feature => 'resource_pool_show_list'}, '/resource_pool'),
-          Menu::Item.new('storage',          deferred_ui_lookup(:tables => 'storages'),
-                         'storage',       {:feature => 'storage_show_list'},       '/storage'),
-          Menu::Item.new('pxe',              N_('PXE'),              'pxe',           {:feature => 'pxe', :any => true},       '/pxe/explorer'),
-          Menu::Item.new('miq_request_host', N_('Requests'),         nil,             {:feature => 'miq_request_show_list'},   '/miq_request?typ=host'),
-        ])
+                                Menu::Item.new('ems_infra',        N_('Providers'),        'ems_infra',        {:feature => 'ems_infra_show_list'},     '/ems_infra'),
+                                Menu::Item.new('ems_cluster',      clusters_name,          'ems_cluster',      {:feature => 'ems_cluster_show_list'},   '/ems_cluster'),
+                                Menu::Item.new('host',             hosts_name,             'host',             {:feature => 'host_show_list'},          '/host'),
+                                Menu::Item.new('vm_infra',         N_('Virtual Machines'), 'vm_infra_explorer',
+                                               {:feature => 'vm_infra_explorer', :any => true},
+                                               '/vm_infra/explorer'),
+                                Menu::Item.new('resource_pool',    N_('Resource Pools'),   'resource_pool',    {:feature => 'resource_pool_show_list'}, '/resource_pool'),
+                                Menu::Item.new('storage',          deferred_ui_lookup(:tables => 'storages'),
+                                               'storage',       {:feature => 'storage_show_list'},       '/storage'),
+                                Menu::Item.new('pxe',              N_('PXE'),              'pxe',              {:feature => 'pxe', :any => true},           '/pxe/explorer'),
+                                Menu::Item.new('infra_networking', N_('Networking'),       'infra_networking', {:feature => 'infra_networking', :any => true}, '/infra_networking/explorer'),
+                                Menu::Item.new('miq_request_host', N_('Requests'),         nil,                {:feature => 'miq_request_show_list'},       '/miq_request?typ=host'),
+                              ])
       end
 
       def hybrid_name(klass, name1, name2, name3)
@@ -138,11 +134,16 @@ module Menu
       def middleware_menu_section
         Menu::Section.new(:mdl, N_("Middleware"), 'fa product-middleware fa-2x', [
           Menu::Item.new('ems_middleware', N_('Providers'), 'ems_middleware', {:feature => 'ems_middleware_show_list'}, '/ems_middleware'),
-          Menu::Item.new('middleware_domain', deferred_ui_lookup(:tables => 'middleware_domains'), 'middleware_domain', {:feature => 'middleware_domain_show_list'}, '/middleware_domain'),
-          Menu::Item.new('middleware_server', deferred_ui_lookup(:tables => 'middleware_server'), 'middleware_server', {:feature => 'middleware_server_show_list'}, '/middleware_server'),
-          Menu::Item.new('middleware_deployment', deferred_ui_lookup(:tables => 'middleware_deployment'), 'middleware_deployment', {:feature => 'middleware_deployment_show_list'}, '/middleware_deployment'),
-          Menu::Item.new('middleware_datasource', deferred_ui_lookup(:tables => 'middleware_datasource'), 'middleware_datasource', {:feature => 'middleware_datasource_show_list'}, '/middleware_datasource'),
-          Menu::Item.new('middleware_messaging', deferred_ui_lookup(:tables => 'middleware_messaging'), 'middleware_messaging', {:feature => 'middleware_messaging_show_list'}, '/middleware_messaging'),
+          Menu::Item.new('middleware_domain', N_('Domains'), 'middleware_domain',
+                         {:feature => 'middleware_domain_show_list'}, '/middleware_domain'),
+          Menu::Item.new('middleware_server', N_('Servers'), 'middleware_server',
+                         {:feature => 'middleware_server_show_list'}, '/middleware_server'),
+          Menu::Item.new('middleware_deployment', N_('Deployments'), 'middleware_deployment',
+                         {:feature => 'middleware_deployment_show_list'}, '/middleware_deployment'),
+          Menu::Item.new('middleware_datasource', N_('Datasources'), 'middleware_datasource',
+                         {:feature => 'middleware_datasource_show_list'}, '/middleware_datasource'),
+          Menu::Item.new('middleware_messaging', N_('Messagings'), 'middleware_messaging',
+                         {:feature => 'middleware_messaging_show_list'}, '/middleware_messaging'),
           Menu::Item.new('middleware_topology', N_('Topology'), 'middleware_topology', {:feature => 'middleware_topology', :any => true}, '/middleware_topology')
 
         ])
@@ -163,7 +164,33 @@ module Menu
       end
 
       def storage_menu_section
+        netapp_enabled = VMDB::Config.new("vmdb").config[:product][:storage]
         Menu::Section.new(:sto, N_("Storage"), 'fa fa-database fa-2x', [
+                            Menu::Item.new('ems_storage',
+                                           N_('Storage Providers'),
+                                           'ems_storage',
+                                           {:feature => 'ems_storage_show_list'},
+                                           '/ems_storage'),
+                            Menu::Item.new('cloud_volume',
+                                           N_('Volumes'),
+                                           'cloud_volume',
+                                           {:feature => 'cloud_volume_show_list'},
+                                           '/cloud_volume'),
+                            Menu::Item.new('cloud_object_store_container',
+                                           N_('Object Stores'),
+                                           'cloud_object_store_container',
+                                           {:feature => 'cloud_object_store_container_show_list'},
+                                           '/cloud_object_store_container'),
+                            netapp_enabled ? netapp_storage_menu_section : empty_menu_section
+                          ])
+      end
+
+      def empty_menu_section
+        Menu::Section.new(nil, nil, nil, nil)
+      end
+
+      def netapp_storage_menu_section
+        Menu::Section.new(:nap, N_("NetApp"), 'fa fa-plus fa-2x', [
           Menu::Item.new('ontap_storage_system', deferred_ui_lookup(:tables => 'ontap_storage_system'), 'ontap_storage_system', {:feature => 'ontap_storage_system_show_list'}, '/ontap_storage_system'),
           Menu::Item.new('ontap_logical_disk',   deferred_ui_lookup(:tables => 'ontap_logical_disk'),   'ontap_logical_disk',   {:feature => 'ontap_logical_disk_show_list'},   '/ontap_logical_disk'),
           Menu::Item.new('ontap_storage_volume', deferred_ui_lookup(:tables => 'ontap_storage_volume'), 'ontap_storage_volume', {:feature => 'ontap_storage_volume_show_list'}, '/ontap_storage_volume'),
@@ -182,14 +209,20 @@ module Menu
       end
 
       def automate_menu_section
+        generic_object_item = if VMDB::Config.new("vmdb").config[:product][:generic_object] == true
+          Menu::Item.new('generic_object',       N_('Generic Objects'), 'generic_object_explorer',       {:feature => 'generic_object_explorer'},       '/generic_object/explorer')
+        else
+          nil
+        end
         Menu::Section.new(:aut, N_("Automate"), 'fa fa-recycle fa-2x', [
           Menu::Item.new('miq_ae_class',         N_('Explorer'),        'miq_ae_class_explorer',         {:feature => 'miq_ae_domain_view'},            '/miq_ae_class/explorer'),
           Menu::Item.new('miq_ae_tools',         N_('Simulation'),      'miq_ae_class_simulation',       {:feature => 'miq_ae_class_simulation'},       '/miq_ae_tools/resolve'),
           Menu::Item.new('miq_ae_customization', N_('Customization'),   'miq_ae_customization_explorer', {:feature => 'miq_ae_customization_explorer'}, '/miq_ae_customization/explorer'),
+          generic_object_item,
           Menu::Item.new('miq_ae_export',        N_('Import / Export'), 'miq_ae_class_import_export',    {:feature => 'miq_ae_class_import_export'},    '/miq_ae_tools/import_export'),
           Menu::Item.new('miq_ae_logs',          N_('Log'),             'miq_ae_class_log',              {:feature => 'miq_ae_class_log'},              '/miq_ae_tools/log'),
           Menu::Item.new('miq_request_ae',       N_('Requests'),        nil,                             {:feature => 'miq_request_show_list'},         "/miq_request?typ=ae")
-        ])
+        ].compact)
       end
 
       def optimize_menu_section
@@ -209,9 +242,8 @@ module Menu
       end
 
       def default_menu
-        storage_enabled = VMDB::Config.new("vmdb").config[:product][:storage]
         [cloud_inteligence_menu_section, services_menu_section, compute_menu_section, configuration_menu_section,
-         network_menu_section, middleware_menu_section, storage_enabled ? storage_menu_section : nil,
+         network_menu_section, middleware_menu_section, storage_menu_section,
          control_menu_section, automate_menu_section, optimize_menu_section, settings_menu_section].compact
       end
     end

@@ -1,6 +1,6 @@
 /* global miqAjaxButton miqBuildCalendar miqButtons miqJqueryRequest miqRESTAjaxButton miqSparkleOff miqSparkleOn */
 
-ManageIQ.angular.app.service('miqService', function() {
+ManageIQ.angular.app.service('miqService', ['$timeout', '$document', function($timeout, $document) {
   this.storedPasswordPlaceholder = "●●●●●●●●";
 
   this.showButtons = function() {
@@ -16,8 +16,12 @@ ManageIQ.angular.app.service('miqService', function() {
     miqBuildCalendar(true);
   };
 
-  this.miqAjaxButton = function(url, serializeFields) {
-    miqAjaxButton(url, serializeFields);
+  this.miqAjaxButton = function(url, serializeFields, options) {
+    miqAjaxButton(url, serializeFields, options);
+  };
+
+  this.miqAsyncAjaxButton = function(url, serializeFields) {
+    miqJqueryRequest(url, {beforeSend: true, data: serializeFields});
   };
 
   this.restAjaxButton = function(url, button, dataType, data) {
@@ -67,6 +71,15 @@ ManageIQ.angular.app.service('miqService', function() {
     return form.$valid && form.$dirty;
   };
 
+  this.dynamicAutoFocus = function(element) {
+    $timeout(function() {
+      var queryResult = $document[0].getElementById(element);
+      if (queryResult) {
+        queryResult.focus();
+      }
+    }, 200);
+  };
+
   this.validateWithAjax = function (url) {
     miqSparkleOn();
     miqAjaxButton(url, true);
@@ -99,4 +112,4 @@ ManageIQ.angular.app.service('miqService', function() {
 
     return serializedObj;
   };
-});
+}]);

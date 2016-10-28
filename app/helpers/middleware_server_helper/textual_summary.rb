@@ -4,7 +4,7 @@ module MiddlewareServerHelper::TextualSummary
   #
 
   def textual_group_properties
-    %i(name hostname feed bind_addr product version)
+    %i(name hostname feed bind_addr server_state product version)
   end
 
   def textual_group_relationships
@@ -28,6 +28,11 @@ module MiddlewareServerHelper::TextualSummary
      :value => @record.properties['Bound Address']}
   end
 
+  def textual_server_state
+    {:label => _('Server State'),
+     :value => @record.properties['Server State'].capitalize}
+  end
+
   def textual_product
     @record.product
   end
@@ -43,7 +48,7 @@ module MiddlewareServerHelper::TextualSummary
      {
          :label      => "Underlying #{lives_on_entity_name}",
          :image      => "vendor-#{lives_on_ems.image_name}",
-         :value      => "#{@record.lives_on.name}",
+         :value      => @record.lives_on.name.to_s,
          :link       => url_for(
            :action     => 'show',
            :controller => 'vm_or_template',

@@ -8,14 +8,19 @@ module VmCommon
     params[:page] = @current_page unless @current_page.nil?   # Save current page for list refresh
     @refresh_div = "main_div" # Default div for button.rjs to refresh
 
-    custom_buttons                if params[:pressed] == "custom_button"
-    perf_chart_chooser            if params[:pressed] == "perf_reload"
-    perf_refresh_data             if params[:pressed] == "perf_refresh"
-    remove_service                if params[:pressed] == "remove_service"
-
-    return if ["custom_button"].include?(params[:pressed])    # custom button screen, so return, let custom_buttons method handle everything
-    # VM sub-screen is showing, so return
-    return if ["perf_reload"].include?(params[:pressed]) && @flash_array.nil?
+    case params[:pressed]
+    when 'custom_button'
+      custom_buttons
+      return
+    when 'perf_reload'
+      perf_chart_chooser
+      # VM sub-screen is showing, so return
+      return if @flash_array.nil?
+    when 'perf_refresh'
+      perf_refresh_data
+    when 'remove_service'
+      remove_service
+    end
 
     if @flash_array.nil? # if no button handler ran, show not implemented msg
       add_flash(_("Button not yet implemented"), :error)
@@ -48,7 +53,7 @@ module VmCommon
         replace_gtl_main_div
       else
         if @refresh_div == "flash_msg_div"
-          render :partial => "shared/ajax/flash_msg_replace"
+          javascript_flash(:spinner_off => true)
         else
           options
           partial_replace(@refresh_div, "vm_common/#{@refresh_partial}")
@@ -90,15 +95,9 @@ module VmCommon
     vm = identify_record(params[:id], VmOrTemplate)
 
     if vm.supports_launch_cockpit?
-      url = vm.cockpit_url
-      render :update do |page|
-        page << javascript_prologue
-        page << "miqSparkle(false);"
-        page << "window.open('#{url}');"
-      end
+      javascript_open_window(vm.cockpit_url)
     else
-      add_flash(vm.unsupported_reason(:launch_cockpit))
-      javascript_flash
+      javascript_flash(:text => vm.unsupported_reason(:launch_cockpit), :severity => :error, :spinner_off => true)
     end
   end
 
@@ -261,7 +260,8 @@ module VmCommon
     elsif @display == "snapshot_info"
       drop_breadcrumb(:name => @record.name + _(" (Snapshots)"),
                       :url  => "/#{rec_cls}/show/#{@record.id}?display=#{@display}")
-      @snapshot_tree = TreeBuilderSnapshots.new(:snapshot_tree, :snapshot, @sb, true, @record)
+      @snapshot_tree = TreeBuilderSnapshots.new(:snapshot_tree, :snapshot, @sb, true, :root => @record)
+      @active = !['root', nil].include?(@snapshot_tree.selected_node)
       @button_group = "snapshot"
     elsif @display == "devices"
       drop_breadcrumb(:name => @record.name + _(" (Devices)"),
@@ -273,7 +273,7 @@ module VmCommon
                       :url  => "/#{rec_cls}/show/#{@record.id}?display=#{@display}")
       # session[:base_id] = @record.id
       vmtree_nodes = vmtree(@record)
-      @vm_tree = vmtree_nodes.to_json
+      @vm_tree = TreeBuilder.convert_bs_tree(vmtree_nodes).to_json
       @tree_name = "genealogy_tree"
       @button_group = "vmtree"
     elsif @display == "compliance_history"
@@ -397,36 +397,23 @@ module VmCommon
 
   # Recursive method to build a snapshot tree node
   def vm_kidstree(vm)
-    branch = {}
     key = "_v-#{vm.id}"
     title = vm.name
-    style = ""
     tooltip = _("VM: %{name} (Click to view)") % {:name => vm.name}
     if session[:base_vm] == "_h-#{vm.id}"
       title << _(" (Selected)")
       key = session[:base_vm]
-      style = "dynatree-cfme-active cfme-no-cursor-node"
       tooltip = ""
     end
     image = ""
     if vm.template?
-      if vm.host
-        image = "template.png"
-      else
-        image = "template-no-host.png"
-      end
+      image = vm.host ? "template.png" : "template-no-host.png"
     else
       image = "#{vm.current_state.downcase}.png"
     end
-    branch = TreeNodeBuilder.generic_tree_node(
-      key,
-      title,
-      image,
-      tooltip,
-      :style_class => style
-    )
+    branch = TreeNodeBuilder.generic_tree_node(key, title, image, tooltip)
     @tree_vms.push(vm) unless @tree_vms.include?(vm)
-    if vm.children.length > 0
+    if vm.children.any?
       kids = []
       vm.children.each do |kid|
         kids.push(vm_kidstree(kid)) unless @tree_vms.include?(kid)
@@ -451,7 +438,12 @@ module VmCommon
       @display = "snapshot_info"
       add_flash(_("Last selected Snapshot no longer exists"), :error)
     end
-    @snapshot_tree = TreeBuilderSnapshots.new(:snapshot_tree, :snapshot, @sb, true, @record, session[:snap_selected])
+    @snapshot_tree = TreeBuilderSnapshots.new(:snapshot_tree,
+                                              :snapshot,
+                                              @sb,
+                                              true,
+                                              :root          => @record,
+                                              :selected_node => session[:snap_selected])
     @active = @snap_selected.current.to_i == 1 if @snap_selected
     @button_group = "snapshot"
     @explorer = true
@@ -578,7 +570,7 @@ module VmCommon
         drop_breadcrumb(:name => _("Snapshot VM '%{name}'") % {:name => @record.name}, :url => "/vm_common/snap")
         if session[:edit] && session[:edit][:explorer]
           @edit = session[:edit]    # saving it to use in next transaction
-          render :partial => "shared/ajax/flash_msg_replace"
+          javascript_flash(:spinner_off => true)
         else
           render :action => "snap"
         end
@@ -593,7 +585,7 @@ module VmCommon
                            :name        => params[:name],
                            :description => params[:description],
                            :memory      => params[:snap_memory] == "1")
-        rescue StandardError => bang
+        rescue => bang
           puts bang.backtrace.join("\n")
           flash = _("Error during 'Create Snapshot': %{message}") % {:message => bang.message}
           flash_error = true
@@ -818,7 +810,7 @@ module VmCommon
       end
     else
       add_flash(_("Button not yet implemented"), :error)
-      render :partial => "shared/ajax/flash_msg_replace"
+      javascript_flash(:spinner_off => true)
     end
   end
 
@@ -840,7 +832,7 @@ module VmCommon
       flash = _("%{model} \"%{name}\" successfully added to Service \"%{to_name}\"") % {:model => ui_lookup(:model => "Vm"), :name => @record.name, :to_name => Service.find(chosen).name}
       begin
         @record.add_to_vsc(Service.find(chosen).name)
-      rescue StandardError => bang
+      rescue => bang
         flash = _("Error during 'Add VM to service': %{message}") % {:message => bang}
       end
       redirect_to :action => @lastaction, :id => @record.id, :flash_msg => flash
@@ -853,7 +845,7 @@ module VmCommon
     begin
       @vervice_name = Service.find_by_name(@record.location).name
       @record.remove_from_vsc(@vervice_name)
-    rescue StandardError => bang
+    rescue => bang
       add_flash(_("Error during 'Remove VM from service': %{message}") % {:message => bang.message}, :error)
     else
       add_flash(_("VM successfully removed from service \"%{name}\"") % {:name => @vervice_name})
@@ -943,7 +935,7 @@ module VmCommon
           @record.save!
           vms.each { |v| @record.remove_child(v) unless kids.include?(v.id) }                                # Remove any VMs no longer in the kids list box
           kids.each_key { |k| @record.set_child(VmOrTemplate.find(k)) }                                             # Add all VMs in kids hash, dups will not be re-added
-        rescue StandardError => bang
+        rescue => bang
           add_flash(_("Error during '%{name} update': %{message}") % {:name    => @record.class.base_model.name,
                                                                       :message => bang.message}, :error)
           AuditEvent.failure(audit.merge(:message => "[#{@record.name} -- #{@record.location}] Update returned: #{bang}"))
@@ -1092,7 +1084,7 @@ module VmCommon
       add_flash(_("User is not authorized to view %{model} \"%{name}\"") %
         {:model => ui_lookup(:model => @record.class.base_model.to_s), :name => @record.name},
                 :error) unless flash_errors?
-      render :partial => "shared/tree_select_error", :locals => {:options => {:select_node => x_node}}
+      javascript_flash(:spinner_off => true, :activate_node => {:tree => x_active_tree.to_s, :node => x_node})
     end
   end
 
@@ -1119,7 +1111,7 @@ module VmCommon
         ems.validate_remote_console_vmrc_support
       rescue MiqException::RemoteConsoleNotSupportedError => e
         add_flash(_("Console access failed: %{message}") % {:message => e.message}, :error)
-        render :partial => "shared/ajax/flash_msg_replace"
+        javascript_flash(:spinner_off => true)
         return
       end
     end
@@ -1129,7 +1121,7 @@ module VmCommon
                 {:id => task_id.inspect}, :error) unless task_id.kind_of?(Fixnum)
 
     if @flash_array
-      render :partial => "shared/ajax/flash_msg_replace"
+      javascript_flash(:spinner_off => true)
     else
       initiate_wait_for_task(:task_id => task_id)
     end
@@ -1141,20 +1133,16 @@ module VmCommon
     unless miq_task.results_ready?
       add_flash(_("Console access failed: %{message}") % {:message => miq_task.message}, :error)
     end
-    render :update do |page|
-      page << javascript_prologue
-      if @flash_array
-        page.replace(:flash_msg_div, :partial => "layouts/flash_msg")
-        page << "miqSparkle(false);"
-      else # open a window to show a VNC or VMWare console
-        console_action = console_type == 'html5' ? 'launch_html5_console' : 'launch_vmware_console'
-        page << "miqSparkle(false);"
-        if miq_task.task_results[:remote_url]
-          page << "window.open('#{miq_task.task_results[:remote_url]}');"
-        else
-          page << "window.open('#{url_for(miq_task.task_results.merge(:controller => controller_name, :action => console_action, :id => j(params[:id])))}');"
-        end
-      end
+    if @flash_array
+      javascript_flash(:spinner_off => true)
+    else # open a window to show a VNC or VMWare console
+      url = if miq_task.task_results[:remote_url]
+              miq_task.task_results[:remote_url]
+            else
+              console_action = console_type == 'html5' ? 'launch_html5_console' : 'launch_vmware_console'
+              url_for(miq_task.task_results.merge(:controller => controller_name, :action => console_action, :id => j(params[:id])))
+            end
+      javascript_open_window(url)
     end
   end
 
@@ -1164,7 +1152,7 @@ module VmCommon
     existing_node = nil                     # Init var
 
     if record.orphaned? || record.archived?
-      parents = [{:type => "x", :id => "#{record.orphaned ? "orph" : "arch"}"}]
+      parents = [{:type => "x", :id => (record.orphaned ? "orph" : "arch")}]
     else
       if x_active_tree == :instances_tree
         parents = record.kind_of?(ManageIQ::Providers::CloudManager::Vm) && record.availability_zone ? [record.availability_zone] : [record.ext_management_system]
@@ -1194,7 +1182,7 @@ module VmCommon
       end
     end
 
-    add_nodes = {:key => existing_node, :children => tree_add_child_nodes(existing_node)} if existing_node
+    add_nodes = {:key => existing_node, :nodes => tree_add_child_nodes(existing_node)} if existing_node
     add_nodes
   end
 
@@ -1237,14 +1225,15 @@ module VmCommon
           @breadcrumbs.clear
           drop_breadcrumb({:name => breadcrumb_name(model), :url => "/#{controller_name}/explorer"}, false)
         end
-        @right_cell_text = _("%{model} \"%{name}\"") % {:name => @record.name, :model => "#{ui_lookup(:model => model && model != "VmOrTemplate" ? model : TreeBuilder.get_model_for_prefix(@nodetype))}"}
+        @right_cell_text = _("%{model} \"%{name}\"") % {:name => @record.name, :model => (ui_lookup(:model => model && model != "VmOrTemplate" ? model : TreeBuilder.get_model_for_prefix(@nodetype))).to_s}
       end
     else      # Get list of child VMs of this node
       options = {:model => model}
       if x_node == "root"
-        # TODO: potential to move this into a model with a scope built into it
-        options[:where_clause] =
-          ["vms.type IN (?)", ManageIQ::Providers::InfraManager::Vm.subclasses.collect(&:name) + ManageIQ::Providers::InfraManager::Template.subclasses.collect(&:name)] if x_active_tree == :vandt_tree
+        if x_active_tree == :vandt_tree
+          klass = ManageIQ::Providers::InfraManager::VmOrTemplate
+          options[:where_clause] = ["vms.type IN (?)", klass.vm_descendants.collect(&:name)]
+        end
         process_show_list(options)  # Get all VMs & Templates
         # :model=>ui_lookup(:models=>"VmOrTemplate"))
         # TODO: Change ui_lookup/dictionary to handle VmOrTemplate, returning VMs And Templates
@@ -1255,8 +1244,10 @@ module VmCommon
                            end
       else
         if TreeBuilder.get_model_for_prefix(@nodetype) == "Hash"
-          options[:where_clause] =
-            ["vms.type IN (?)", ManageIQ::Providers::InfraManager::Vm.subclasses.collect(&:name) + ManageIQ::Providers::InfraManager::Template.subclasses.collect(&:name)] if x_active_tree == :vandt_tree
+          if x_active_tree == :vandt_tree
+            klass = ManageIQ::Providers::InfraManager::VmOrTemplate
+            options[:where_clause] = ["vms.type IN (?)", klass.vm_descendants.collect(&:name)]
+          end
           if id == "orph"
             options[:where_clause] = MiqExpression.merge_where_clauses(options[:where_clause], VmOrTemplate::ORPHANED_CONDITIONS)
             process_show_list(options)
@@ -1283,7 +1274,7 @@ module VmCommon
                              end
         else
           rec = TreeBuilder.get_model_for_prefix(@nodetype).constantize.find(from_cid(id))
-          options.merge!({:association => "#{@nodetype == "az" ? "vms" : "all_vms_and_templates"}", :parent => rec})
+          options.merge!({:association => (@nodetype == "az" ? "vms" : "all_vms_and_templates"), :parent => rec})
           options[:where_clause] = MiqExpression.merge_where_clauses(
             options[:where_clause], VmOrTemplate::NOT_ARCHIVED_NOR_OPRHANED_CONDITIONS
           )
@@ -1360,7 +1351,7 @@ module VmCommon
          @record && # Showing a record
          !@in_a_form && # Not in a form
          x_active_tree.to_s !~ /_filter_tree$/ # Not in a filter tree; FIXME: create some property on trees for this
-        add_nodes = open_parent_nodes(@record) # Open the parent nodes of selected record, if not open
+        add_nodes = TreeBuilder.convert_bs_tree(open_parent_nodes(@record)).first # Open the parent nodes of selected record, if not open
       end
     end
 
@@ -1387,7 +1378,8 @@ module VmCommon
 
       locals = {:action_url => action, :record_id => @record ? @record.id : nil}
       if %w(clone migrate miq_request_new pre_prov publish
-            reconfigure resize live_migrate attach detach evacuate).include?(@sb[:action])
+            reconfigure resize live_migrate attach detach evacuate
+            associate_floating_ip disassociate_floating_ip).include?(@sb[:action])
         locals[:no_reset]        = true                              # don't need reset button on the screen
         locals[:submit_button]   = @sb[:action] != 'miq_request_new' # need submit button on the screen
         locals[:continue_button] = @sb[:action] == 'miq_request_new' # need continue button on the screen
@@ -1489,7 +1481,8 @@ module VmCommon
           ])
         # these subviews use angular, so they need to use a special partial
         # so the form buttons on the outer frame can be updated.
-        elsif %w(attach detach live_migrate evacuate ownership).include?(@sb[:action])
+        elsif %w(attach detach live_migrate evacuate ownership
+                 associate_floating_ip disassociate_floating_ip).include?(@sb[:action])
           presenter.update(:form_buttons_div, r[:partial => "layouts/angular/paging_div_buttons"])
         elsif action != "retire" && action != "reconfigure_update"
           presenter.update(:form_buttons_div, r[:partial => 'layouts/x_edit_buttons', :locals => locals])
@@ -1649,6 +1642,18 @@ module VmCommon
       partial = "vm_common/evacuate"
       header = _("Evacuating %{model} \"%{name}\"") % {:name => name, :model => ui_lookup(:table => table)}
       action = "evacuate_vm"
+    when "associate_floating_ip"
+      partial = "vm_common/associate_floating_ip"
+      header = _("Associating Floating IP with %{model} \"%{name}\"") % {
+        :name => name, :model => ui_lookup(:table => table)
+      }
+      action = "associate_floating_ip_vm"
+    when "disassociate_floating_ip"
+      partial = "vm_common/disassociate_floating_ip"
+      header = _("Disassociating Floating IP from %{model} \"%{name}\"") % {
+        :name => name, :model => ui_lookup(:table => table)
+      }
+      action = "disassociate_floating_ip_vm"
     when "clone", "migrate", "publish"
       partial = "miq_request/prov_edit"
       task_headers = {"clone"   => _("Clone %{vm_or_template}"),
@@ -1667,8 +1672,8 @@ module VmCommon
       action = "edit_vm"
     when "evm_relationship"
       partial = "vm_common/evm_relationship"
-      header = _("Edit CFME Server Relationship for %{vm_or_template} \"%{name}\"") %
-        {:vm_or_template => ui_lookup(:table => table), :name => name}
+      header = _("Edit %{product} Server Relationship for %{vm_or_template} \"%{name}\"") %
+        {:vm_or_template => ui_lookup(:table => table), :name => name, :product => I18n.t('product.name')}
       action = "evm_relationship_update"
     when "miq_request_new"
       partial = "miq_request/pre_prov"

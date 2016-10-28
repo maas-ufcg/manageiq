@@ -65,7 +65,7 @@ module ReportController::Widgets
         params[:id] = @widget.id.to_s   # reset id in params for show
         # Build the filter expression and attach widget to schedule filter
         exp = {}
-        exp["="] = {"field" => "MiqWidget.id", "value" => @widget.id}
+        exp["="] = {"field" => "MiqWidget-id", "value" => @widget.id}
         @edit[:schedule].filter = MiqExpression.new(exp)
         @edit[:schedule].save
         @edit = session[:edit] = nil    # clean out the saved info
@@ -112,7 +112,7 @@ module ReportController::Widgets
     w = MiqWidget.find_by_id(params[:id])
     begin
       w.queue_generate_content
-    rescue StandardError => bang
+    rescue => bang
       add_flash(_("Widget content generation error: %{message}") % {:message => bang.message}, :error)
     else
       add_flash(_("Content generation for this Widget has been initiated"))
@@ -144,7 +144,7 @@ module ReportController::Widgets
       end
 
       if params[:visibility_typ]
-        page.replace("form_role_visibility", :partial => "layouts/role_visibility", :locals => {:rec_id => "#{@widget.id || "new"}", :action => "widget_form_field_changed"})
+        page.replace("form_role_visibility", :partial => "layouts/role_visibility", :locals => {:rec_id => (@widget.id.to_s || "new"), :action => "widget_form_field_changed"})
       end
 
       javascript_for_timer_type(params[:timer_typ]).each { |js| page << js }

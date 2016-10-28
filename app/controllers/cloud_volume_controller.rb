@@ -50,11 +50,10 @@ class CloudVolumeController < ApplicationController
       checked_volume_id = get_checked_volume_id(params)
       @volume = find_by_id_filtered(CloudVolume, checked_volume_id)
       if @volume.attachments.empty?
-        add_flash(_("%{volume} \"%{volume_name}\" is not attached to any %{instances}") % {
-          :volume      => ui_lookup(:table => 'cloud_volume'),
-          :volume_name => @volume.name,
-          :instances   => ui_lookup(:tables => 'vm_cloud')}, :error)
-        render_flash
+        render_flash(_("%{volume} \"%{volume_name}\" is not attached to any %{instances}") % {
+                     :volume      => ui_lookup(:table => 'cloud_volume'),
+                     :volume_name => @volume.name,
+                     :instances   => ui_lookup(:tables => 'vm_cloud')}, :error)
       else
         javascript_redirect :action => "detach", :id => checked_volume_id
       end
@@ -104,6 +103,15 @@ class CloudVolumeController < ApplicationController
         :url  => "/cloud_volume/show/#{@volume.id}?display=cloud_volume_snapshots"
       )
       @view, @pages = get_view(kls, :parent => @volume, :association => :cloud_volume_snapshots)
+      @showtype = @display
+    when "cloud_volume_backups"
+      title = ui_lookup(:tables => 'cloud_volume_backups')
+      kls   = CloudVolumeBackup
+      drop_breadcrumb(
+        :name => _("%{name} (All %{children})") % {:name => @volume.name, :children => title},
+        :url  => "/cloud_volume/show/#{@volume.id}?display=cloud_volume_backups"
+      )
+      @view, @pages = get_view(kls, :parent => @volume, :association => :cloud_volume_backups)
       @showtype = @display
     when "instances"
       title = ui_lookup(:tables => "vm_cloud")

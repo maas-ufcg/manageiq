@@ -38,11 +38,16 @@ class WebsocketServer
   end
 
   def call(env)
-    if WebSocket::Driver.websocket?(env)
-      exp = %r{^/ws/console/([a-zA-Z0-9]+)/?$}.match(env['REQUEST_URI'])
-      return not_found if exp.nil?
+    if WebSocket::Driver.websocket?(env) && same_origin_as_host?(env)
 
-      init_proxy(env, exp[1])
+      # ActionCable causes live reload crashes
+      if env['REQUEST_URI'] =~ %r{^/ws/notifications}
+        ActionCable.server.call(env)
+      else
+        exp = %r{^/ws/console/([a-zA-Z0-9]+)/?$}.match(env['REQUEST_URI'])
+        return not_found if exp.nil?
+        init_proxy(env, exp[1])
+      end
 
       [-1, {}, []]
     else
@@ -89,5 +94,11 @@ class WebsocketServer
 
   def not_found
     [404, {'Content-Type' => 'text/plain'}, ['Not found']]
+  end
+
+  # Primitive same-origin policy checking in production
+  def same_origin_as_host?(env)
+    proto = Rack::Request.new(env).ssl? ? 'https' : 'http'
+    Rails.env.development? || env['HTTP_ORIGIN'] == "#{proto}://#{env['HTTP_HOST']}"
   end
 end

@@ -7,7 +7,7 @@ namespace :locale do
     ]
     no_plurals = %w(NFS OS) # strings which we don't want to create automatic plurals for
 
-    dict = YAML.load(File.open(Rails.root.join("config/locales/en.yml")))["en"]["dictionary"]
+    dict = YAML.load(File.open(Rails.root.join("locale/en.yml")))["en"]["dictionary"]
     dict.keys.each do |tree|
       next unless %w(column model table).include?(tree) # subtrees of interest
 
@@ -73,6 +73,7 @@ namespace :locale do
     yamls = {
       "db/fixtures/miq_product_features.*" => %w(name description),
       "db/fixtures/miq_report_formats.*"   => %w(description),
+      "db/fixtures/notification_types.*"   => %w(message),
       "product/timelines/miq_reports/*.*"  => %w(title name headers),
       "product/views/*.*"                  => %w(title name headers)
     }
@@ -125,12 +126,24 @@ namespace :locale do
     require 'gettext_i18n_rails/model_attributes_finder'
     require_relative 'model_attribute_override.rb'
 
-    attributes_file = 'config/locales/model_attributes.rb'
+    attributes_file = 'locale/model_attributes.rb'
     File.unlink(attributes_file) if File.exist?(attributes_file)
 
     Rake::Task['gettext:store_model_attributes'].invoke
 
     FileUtils.mv(attributes_file, 'config/model_attributes.rb')
+  end
+
+  desc "Run store_model_attributes task in i18n environment"
+  task "run_store_model_attributes" do
+    system({"RAILS_ENV" => "i18n"}, "bundle exec rake locale:store_model_attributes")
+  end
+
+  desc "Update ManageIQ gettext catalogs"
+  task "update" => ["run_store_model_attributes", "store_dictionary_strings", "extract_yaml_strings", "gettext:find"] do
+    Dir["locale/**/*.edit.po", "locale/**/*.po.time_stamp"].each do |file|
+      File.unlink(file)
+    end
   end
 
   desc "Extract plugin strings - execute as: rake locale:plugin:find[plugin_name]"
@@ -163,5 +176,9 @@ namespace :locale do
                                 :ignore_fuzzy   => true,
                                 :report_warning => false)
     Rake::Task['gettext:find'].invoke
+
+    Dir["#{@engine.root}/locale/**/*.edit.po", "#{@engine.root}/locale/**/*.po.time_stamp"].each do |file|
+      File.unlink(file)
+    end
   end
 end

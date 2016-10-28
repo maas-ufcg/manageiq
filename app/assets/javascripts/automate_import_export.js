@@ -8,11 +8,11 @@ var Automate = {
 
     $.getJSON("automate_json?import_file_upload_id=" + importFileUploadId)
       .done(function(rows_json) {
-        Automate.addDomainOptions(rows_json.children);
-        Automate.setupInitialDynatree(rows_json.children);
+        Automate.addDomainOptions(rows_json);
+        Automate.setupInitialTree(rows_json);
 
         $('select.importing-domains').change(function() {
-          Automate.importingDomainsChangeHandler(rows_json.children);
+          Automate.importingDomainsChangeHandler(rows_json);
         });
 
         $('#import_file_upload_id').val(importFileUploadId);
@@ -77,8 +77,8 @@ var Automate = {
     $.each(domains, function(_index, child) {
       $('select.importing-domains').append(
         $('<option>', {
-          value: child.title,
-          text: child.title
+          value: child.key,
+          text:  child.text
         })
       );
     });
@@ -86,23 +86,30 @@ var Automate = {
     $('select.importing-domains').selectpicker('refresh');
   },
 
-  setupInitialDynatree: function(domains) {
-    $('.domain-tree').dynatree({
-      checkbox: true,
-      children: domains[0].children,
-      selectMode: 3
+  setupInitialTree: function(domains) {
+    $('.domain-tree').treeview({
+      data:              domains[0].nodes,
+      levels:            1,
+      showCheckbox:      true,
+      showImage:         true,
+      hierarchicalCheck: true,
+      expandIcon:        'fa fa-fw fa-chevron-right',
+      collapseIcon:      'fa fa-fw fa-chevron-down'
     });
   },
 
   importingDomainsChangeHandler: function(domains) {
     $.each(domains, function(_index, child) {
-      if ($('select.importing-domains').val() === child.title) {
-        $('.domain-tree').dynatree({
-          checkbox: true,
-          children: child.children,
-          selectMode: 3
+      if ($('select.importing-domains').val() === child.key) {
+        $('.domain-tree').treeview({
+          data:              child.nodes,
+          levels:            1,
+          showCheckbox:      true,
+          showImage:         true,
+          hierarchicalCheck: true,
+          expandIcon:        'fa fa-fw fa-chevron-right',
+          collapseIcon:      'fa fa-fw fa-chevron-down'
         });
-        $('.domain-tree').dynatree('getTree').reload();
       }
     });
 
@@ -128,7 +135,12 @@ var Automate = {
 
       var postData = $('#import-form').serialize();
       postData += '&';
-      postData = postData.concat($.param($('.domain-tree').dynatree('getTree').serializeArray()));
+
+      var treeName = $('.domain-tree').attr('name');
+      var serialized = $.param($('.domain-tree').treeview(true).getChecked().map(function (node) {
+        return {name: treeName, value: node.key}
+      }));
+      postData = postData.concat(serialized);
 
       $.post('import_automate_datastore', postData, function(data) {
         var flashMessage = JSON.parse(data)[0];
@@ -172,7 +184,7 @@ var Automate = {
       miqSparkleOn();
       clearMessages();
 
-      $('.domain-tree').dynatree('destroy');
+      $('.domain-tree').empty();
 
       $.post('cancel_import', $('#import-form').serialize(), function(data) {
         var flashMessage = JSON.parse(data)[0];
@@ -192,10 +204,12 @@ var Automate = {
     });
 
     $('#toggle-all').on('change', function() {
-      $('.domain-tree').dynatree('getRoot').visit(function(node) {
-        node.select($('#toggle-all').prop('checked'));
-      });
+      $('#toggle-all').prop('checked') ? $('.domain-tree').treeview(true).checkAll() : $('.domain-tree').treeview(true).uncheckAll();
     });
+  },
+
+  setUpDefaultGitBranchOrTagValue: function() {
+    $('.git-branch-or-tag').val($('select.git-branches').val());
   },
 
   setUpGitRefreshClickHandlers: function() {
@@ -204,20 +218,20 @@ var Automate = {
       if ($(event.currentTarget).val() === "Branch") {
         $('.git-branch-group').show();
         $('.git-tag-group').hide();
-        $('.git-branch-or-tag').val($('.git-branches').val());
-      } else {
+        $('.git-branch-or-tag').val($('select.git-branches').val());
+      } else if ($(event.currentTarget).val() === "Tag") {
         $('.git-branch-group').hide();
         $('.git-tag-group').show();
-        $('.git-branch-or-tag').val($('.git-tags').val());
+        $('.git-branch-or-tag').val($('select.git-tags').val());
       }
     });
 
-    $('.git-branches').on('change', function(event) {
-      $('.git-branch-or-tag').val($(event.currentTarget).val());
+    $('select.git-branches').on('change', function(event) {
+      $('.git-branch-or-tag').val($('select.git-branches').val());
     });
 
-    $('.git-tags').on('change', function(event) {
-      $('.git-branch-or-tag').val($(event.currentTarget).val());
+    $('select.git-tags').on('change', function(event) {
+      $('.git-branch-or-tag').val($('select.git-tags').val());
     });
   }
 };

@@ -12,6 +12,7 @@ $img-bg-navbar:                             "navbar.png"; // sets a custom backg
 $color-success:                             #3f9c35;
 $color-warning:                             #ec7a08;
 $color-critical:                            #cc0000;
+$color-low-severity:                        #f0ab00;  //(pf-gold-200)
 
 // Product overrides for 'About' Modal
 
@@ -34,6 +35,7 @@ $login-container-details-border-color-rgba: rgba(0, 0, 0, 0.5);
 @import "icon_customizations";
 @import "header_background"; // sets a custom background image in the header
 @import "about_modal_background"; // sets a custom background image in the 'About' modal
+@import "timeline"; // used for the patternfly-timeline styles
 
 
 .login-pf #brand img { // sets size of brand.svg on login screen (upstream only)

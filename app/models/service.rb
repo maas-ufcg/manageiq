@@ -3,6 +3,14 @@ require 'ancestry'
 class Service < ApplicationRecord
   DEFAULT_PROCESS_DELAY_BETWEEN_GROUPS = 120
 
+  ACTION_RESPONSE = {
+    "Power On"   => :start,
+    "Power Off"  => :stop,
+    "Shutdown"   => :shutdown_guest,
+    "Suspend"    => :suspend,
+    "Do Nothing" => nil
+  }.freeze
+
   include VirtualTotalMixin
 
   has_ancestry :orphan_strategy => :destroy
@@ -111,34 +119,41 @@ class Service < ApplicationRecord
     all_vms
   end
 
+  def last_index
+    @last_index ||= last_group_index
+  end
+
   def start
     raise_request_start_event
-    queue_group_action(:start)
+    queue_group_action(:start, 0, 1, delay_for_action(0, :start))
   end
 
   def stop
     raise_request_stop_event
-    queue_group_action(:stop, last_group_index, -1)
+    queue_group_action(:stop, last_index, -1, delay_for_action(last_index, :stop))
   end
 
   def suspend
-    queue_group_action(:suspend, last_group_index, -1)
+    queue_group_action(:suspend, last_index, -1, delay_for_action(last_index, :stop))
   end
 
   def shutdown_guest
-    queue_group_action(:shutdown_guest, last_group_index, -1)
+    queue_group_action(:shutdown_guest, last_index, -1, delay_for_action(last_index, :stop))
   end
 
   def process_group_action(action, group_idx, direction)
     each_group_resource(group_idx) do |svc_rsc|
       begin
         rsc = svc_rsc.resource
+        rsc_action = service_action(action, svc_rsc)
         rsc_name =  "#{rsc.class.name}:#{rsc.id}" + (rsc.respond_to?(:name) ? ":#{rsc.name}" : "")
-        if rsc.respond_to?(action)
-          _log.info "Processing action <#{action}> for Service:<#{name}:#{id}>, RSC:<#{rsc_name}}> in Group Idx:<#{group_idx}>"
-          rsc.send(action)
+        if rsc_action.nil?
+          _log.info "Not Processing action for Service:<#{name}:#{id}>, RSC:<#{rsc_name}}> in Group Idx:<#{group_idx}>"
+        elsif rsc.respond_to?(rsc_action)
+          _log.info "Processing action <#{rsc_action}> for Service:<#{name}:#{id}>, RSC:<#{rsc_name}}> in Group Idx:<#{group_idx}>"
+          rsc.send(rsc_action)
         else
-          _log.info "Skipping action <#{action}> for Service:<#{name}:#{id}>, RSC:<#{rsc.class.name}:#{rsc.id}> in Group Idx:<#{group_idx}>"
+          _log.info "Skipping action <#{rsc_action}> for Service:<#{name}:#{id}>, RSC:<#{rsc.class.name}:#{rsc.id}> in Group Idx:<#{group_idx}>"
         end
       rescue => err
         _log.error "Error while processing Service:<#{name}> Group Idx:<#{group_idx}>  Resource<#{rsc_name}>.  Message:<#{err}>"
@@ -154,7 +169,7 @@ class Service < ApplicationRecord
     end
   end
 
-  def queue_group_action(action, group_idx = 0, direction = 1, deliver_delay = 0)
+  def queue_group_action(action, group_idx, direction, deliver_delay)
     nh = {
       :class_name  => self.class.name,
       :instance_id => id,
@@ -168,6 +183,13 @@ class Service < ApplicationRecord
     nh[:zone] = first_vm.ext_management_system.zone.name unless first_vm.nil?
     MiqQueue.put(nh)
     true
+  end
+
+  def service_action(requested, service_resource)
+    method = "#{requested}_action"
+    response = service_resource.try(method)
+
+    response.nil? ? requested : ACTION_RESPONSE[response]
   end
 
   def validate_reconfigure
@@ -214,5 +236,42 @@ class Service < ApplicationRecord
     user = evm_owner
     user = User.super_admin.tap { |u| u.current_group = miq_group } if user.nil? || !user.miq_group_ids.include?(miq_group_id)
     user
+  end
+
+  def self.queue_chargeback_reports(options = {})
+    Service.all.each do |s|
+      s.queue_chargeback_report_generation(options) unless s.vms.empty?
+    end
+  end
+
+  def chargeback_report_name
+    "Chargeback-Vm-Monthly-#{name}"
+  end
+
+  def generate_chargeback_report(options = {})
+    _log.info "Generation of chargeback report for service #{name} started..."
+    MiqReportResult.where(:name => chargeback_report_name).destroy_all
+    report = MiqReport.new(chargeback_yaml)
+    report.queue_generate_table(options)
+    _log.info "Report #{chargeback_report_name} generated"
+  end
+
+  def chargeback_yaml
+    yaml = YAML.load_file(File.join(Rails.root, "product/chargeback/chargeback_vm_monthly.yaml"))
+    yaml["db_options"][:options][:service_id] = id
+    yaml["title"] = chargeback_report_name
+    yaml
+  end
+
+  def queue_chargeback_report_generation(options = {})
+    MiqQueue.put(
+      :role        => "reporting",
+      :class_name  => self.class.name,
+      :instance_id => id,
+      :method_name => "generate_chargeback_report",
+      :priority    => MiqQueue::NORMAL_PRIORITY,
+      :args        => options
+    )
+    _log.info "Added to queue: generate_chargeback_report for service #{name}"
   end
 end

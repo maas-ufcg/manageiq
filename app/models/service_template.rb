@@ -45,6 +45,11 @@ class ServiceTemplate < ApplicationRecord
   virtual_has_one :custom_actions, :class_name => "Hash"
   virtual_has_one :custom_action_buttons, :class_name => "Array"
 
+  def readonly?
+    return true if super
+    blueprint.try(:published?)
+  end
+
   def children
     service_templates
   end
@@ -129,7 +134,10 @@ class ServiceTemplate < ApplicationRecord
       svc.add_resource(sr.resource, nh) unless sr.resource.nil?
     end
 
-    parent_svc.add_resource!(svc) unless parent_svc.nil?
+    if parent_svc
+      service_resource = ServiceResource.find_by(:id => service_task.options[:service_resource_id])
+      parent_svc.add_resource!(svc, service_resource)
+    end
 
     svc.save
     svc
@@ -234,12 +242,20 @@ class ServiceTemplate < ApplicationRecord
     service.save
   end
 
-  def self.default_provisioning_entry_point
-    '/Service/Provisioning/StateMachines/ServiceProvision_Template/default'
+  def self.default_provisioning_entry_point(service_type)
+    if service_type == 'atomic'
+      '/Service/Provisioning/StateMachines/ServiceProvision_Template/CatalogItemInitialization'
+    else
+      '/Service/Provisioning/StateMachines/ServiceProvision_Template/CatalogBundleInitialization'
+    end
   end
 
   def self.default_retirement_entry_point
-    '/Service/Retirement/StateMachines/ServiceRetirement/default'
+    '/Service/Retirement/StateMachines/ServiceRetirement/Default'
+  end
+
+  def self.default_reconfiguration_entry_point
+    nil
   end
 
   def template_valid?

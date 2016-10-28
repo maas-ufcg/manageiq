@@ -42,6 +42,8 @@ module Mixins
                  :name  => update_ems.name}
         construct_edit_for_audit(update_ems)
         AuditEvent.success(build_saved_audit(update_ems, @edit))
+        update_ems.authentication_check_types_queue(update_ems.authentication_for_summary.pluck(:authtype),
+                                                    :save => true)
         ems_path = ems_path(update_ems, :flash_msg => flash)
         javascript_redirect ems_path
       else
@@ -216,6 +218,7 @@ module Mixins
       render :json => {:name                            => @ems.name,
                        :emstype                         => @ems.emstype,
                        :zone                            => zone,
+                       :tenant_mapping_enabled          => @ems.tenant_mapping_enabled == true,
                        :provider_id                     => @ems.provider_id ? @ems.provider_id : "",
                        :hostname                        => @ems.hostname,
                        :default_hostname                => default_hostname,
@@ -294,6 +297,16 @@ module Mixins
                        :default_auth_status       => default_auth_status,
                        :hawkular_auth_status      => hawkular_auth_status.nil? ? true : hawkular_auth_status,
       } if controller_name == "ems_container"
+
+      render :json => {:name                => @ems.name,
+                       :emstype             => @ems.emstype,
+                       :zone                => zone,
+                       :default_hostname    => @ems.connection_configurations.default.endpoint.hostname,
+                       :default_api_port    => @ems.connection_configurations.default.endpoint.port,
+                       :default_userid      => @ems.authentication_userid ? @ems.authentication_userid : "",
+                       :ems_controller      => controller_name,
+                       :default_auth_status => default_auth_status,
+      } if controller_name == "ems_middleware"
     end
 
     private ############################
@@ -313,12 +326,13 @@ module Mixins
     end
 
     def set_ems_record_vars(ems, mode = nil)
-      ems.name              = params[:name].strip if params[:name]
-      ems.provider_region   = params[:provider_region]
-      ems.api_version       = params[:api_version].strip if params[:api_version]
-      ems.provider_id       = params[:provider_id]
-      ems.zone              = Zone.find_by_name(params[:zone])
-      ems.security_protocol = params[:default_security_protocol].strip if params[:default_security_protocol]
+      ems.name                   = params[:name].strip if params[:name]
+      ems.provider_region        = params[:provider_region]
+      ems.api_version            = params[:api_version].strip if params[:api_version]
+      ems.provider_id            = params[:provider_id]
+      ems.zone                   = Zone.find_by_name(params[:zone])
+      ems.tenant_mapping_enabled = params[:tenant_mapping_enabled] == "on" if ems.class.supports_cloud_tenant_mapping?
+      ems.security_protocol      = params[:default_security_protocol].strip if params[:default_security_protocol]
 
       hostname = params[:default_hostname].strip if params[:default_hostname]
       port = params[:default_api_port].strip if params[:default_api_port]
@@ -396,6 +410,10 @@ module Mixins
 
         default_endpoint = {:role => :default, :hostname => hostname, :port => port}
         hawkular_endpoint = {:role => :hawkular, :hostname => hawkular_hostname, :port => hawkular_api_port}
+      end
+
+      if ems.kind_of?(ManageIQ::Providers::Hawkular::MiddlewareManager)
+        default_endpoint = {:role => :default, :hostname => hostname, :port => port}
       end
 
       endpoints = {:default     => default_endpoint,
@@ -491,6 +509,9 @@ module Mixins
         :provider_id           => ems.provider_id,
         :zone                  => ems.zone
       }
+
+      @edit[:current][:tenant_mapping_enabled] = ems.tenant_mapping_enabled if ems.class.supports_cloud_tenant_mapping?
+
       @edit[:new] = {:name                  => params[:name],
                      :provider_region       => params[:provider_region],
                      :hostname              => params[:hostname],
@@ -502,6 +523,8 @@ module Mixins
                      :provider_id           => params[:provider_id],
                      :zone                  => params[:zone]
       }
+
+      @edit[:new][:tenant_mapping_enabled] = params[:tenant_mapping_enabled] if ems.class.supports_cloud_tenant_mapping?
     end
   end
 end

@@ -174,10 +174,12 @@ module ManageIQ::Providers
         :provider_physical_network => network.provider_physical_network,
         :provider_network_type     => network.provider_network_type,
         :provider_segmentation_id  => network.provider_segmentation_id,
+        :port_security_enabled     => network.attributes["port_security_enabled"],
+        :qos_policy_id             => network.attributes["qos_policy_id"],
         :vlan_transparent          => network.attributes["vlan_transparent"],
+
         # TODO(lsmola) expose attributes in FOG
         :maximum_transmission_unit => network.attributes["mtu"],
-        :port_security_enabled     => network.attributes["port_security_enabled"],
       }
       return uid, new_result
     end
@@ -282,7 +284,7 @@ module ManageIQ::Providers
         :allocation_pools               => subnet.allocation_pools,
         :host_routes                    => subnet.host_routes,
         :ip_version                     => subnet.ip_version,
-        :subnetpool_id                  => subnet.attributes["subnetpool_id"],
+        :parent_cloud_subnet            => subnet.attributes["vsd_managed"] ? CloudSubnet.find_by(:ems_ref => subnet.attributes["vsd_id"]) : nil,
       }
     end
 

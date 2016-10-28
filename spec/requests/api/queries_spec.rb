@@ -62,6 +62,23 @@ describe "Queries API" do
 
       expect_single_resource_query("id" => vm1.id, "href" => vm1_url, "guid" => vm1.guid)
     end
+
+    it 'supports compressed ids' do
+      api_basic_authorize action_identifier(:vms, :read, :resource_actions, :get)
+
+      run_get vms_url(ApplicationRecord.compress_id(vm1.id))
+
+      expect_single_resource_query("id" => vm1.id, "href" => vm1_url, "guid" => vm1.guid)
+    end
+
+    it 'returns 404 on url with trailing garbage' do
+      api_basic_authorize action_identifier(:vms, :read, :resource_actions, :get)
+      vm1   # create resource
+
+      run_get vm1_url + 'garbage'
+
+      expect(response).to have_http_status(:not_found)
+    end
   end
 
   describe "Query subcollections" do
@@ -104,6 +121,21 @@ describe "Queries API" do
       expect_result_resources_to_include_keys("resources", %w(id href))
       expect_result_resources_to_include_hrefs("resources", :vm1_accounts_url_list)
       expect_result_resources_to_include_data("resources", "id" => [acct1.id, acct2.id])
+    end
+
+    it 'supports compressed ids' do
+      api_basic_authorize
+
+      run_get vms_url(ApplicationRecord.compress_id(vm1.id)) + "/accounts/#{acct1.id}"
+
+      expect_single_resource_query("id" => acct1.id, "href" => acct1_url, "name" => acct1.name)
+    end
+
+    it 'returns 404 on url with trailing garbage' do
+      api_basic_authorize
+
+      run_get acct1_url + 'garbage'
+      expect(response).to have_http_status(:not_found)
     end
   end
 

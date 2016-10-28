@@ -2,7 +2,7 @@
 - case @display
 - when "devices"
   - unless @devices.empty?
-    %table.table.table-bordered.table-striped
+    %table.table.table-bordered.table-striped.table-summary-screen
       %thead
         %tr
           %th{:colspan => "2"}= _('Devices')
@@ -16,7 +16,7 @@
               = h(item[:description])
 - when "os_info"
   - if @osinfo
-    %table.table.table-bordered.table-striped
+    %table.table.table-bordered.table-striped.table-summary-screen
       %thead
         %tr
           %th{:colspan => "2"}= _('Basic Information')
@@ -52,7 +52,7 @@
 
 - when "hv_info"
   - if @vmminfo
-    %table.table.table-bordered.table-striped
+    %table.table.table-bordered.table-striped.table-summary-screen
       %thead
         %tr
           %th{:colspan => "2"}= _('Basic Information')
@@ -65,7 +65,7 @@
               = h(item[:description])
 
     %hr
-    %table.table.table-bordered.table-striped
+    %table.table.table-bordered.table-striped.table-summary-screen
       %thead
         %tr
           %th{:colspan => "2"}= _('Devices')
@@ -88,23 +88,12 @@
   = render :partial => "vm_common/snapshots_tree"
 
 - when "vmtree_info"
-  -# Create divs for each VM to display as the mouse hovers over each VM node
-  - @tree_vms.each do |v|
-    - prefix = session[:base_vm] == "_h-#{v.id}" ? 'h' : 'v'
-    #outer
-      #inner
-        %div{:id => "#{prefix}-#{v.id}", :style => "display:none; z-index:10; width: 72px; height: 72px; padding: 0 0px 0px 0px"}
-          %div{:style => "margin-left: -70px;"}
-            = render_quadicon(v, :mode => :icon, :typ => :listnav, :size => 72)
-            %div
-              %center{:style => 'color:#000;'}
-                = h(v.product_name)
   = render :partial => "vm_common/vmtree"
 
 - when "networks"
   - if @vmminfo
     - @record.hardware.networks.each do |adapter|
-      %table.table.table-bordered.table-striped
+      %table.table.table-bordered.table-striped.table-summary-screen
         %thead
           %tr
             %th{:colspan => "2"}= _('Network Adapter')
@@ -123,7 +112,7 @@
               %td
                 = adapter.send(sym)
 - when "resources_info"
-  %table.table.table-bordered.table-striped
+  %table.table.table-bordered.table-striped.table-summary-screen
     %thead
       %tr
         %th{:colspan => "2"}= _('Account Policies')

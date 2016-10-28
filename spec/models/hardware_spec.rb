@@ -1,5 +1,5 @@
 describe Hardware do
-  include ArelSpecHelper
+  include Spec::Support::ArelHelper
   let(:vm) { FactoryGirl.create(:vm_vmware, :hardware => FactoryGirl.create(:hardware)) }
   let(:template) { FactoryGirl.create(:template_vmware, :hardware => FactoryGirl.create(:hardware)) }
   let(:host) { FactoryGirl.create(:host, :hardware => FactoryGirl.create(:hardware)) }
@@ -112,6 +112,70 @@ describe Hardware do
         hardware.save
         expect(virtual_column_sql_value(Hardware, "v_pct_free_disk_space")).to eq(nil)
         expect(virtual_column_sql_value(Hardware, "v_pct_used_disk_space")).to eq(nil)
+      end
+    end
+  end
+
+  describe ".allocated_disk_storage" do
+    let(:hardware) { FactoryGirl.create(:hardware) }
+
+    context "with no disks" do
+      it "bails ruby calculation" do
+        expect(hardware.allocated_disk_storage).to eq(0) # TODO
+      end
+
+      it "bails database calculation" do
+        hardware
+        expect(virtual_column_sql_value(Hardware, "allocated_disk_storage")).to be_nil
+      end
+    end
+
+    context "with disks" do
+      before do
+        FactoryGirl.create(:disk, :size_on_disk => 1024, :size => 10240, :hardware => hardware)
+        FactoryGirl.create(:disk, :size => 1024, :hardware => hardware)
+        FactoryGirl.create(:disk, :hardware => hardware)
+      end
+
+      it "calculates in ruby" do
+        expect(hardware.allocated_disk_storage).to eq(11264)
+      end
+
+      it "calculates in the database" do
+        hardware
+        expect(virtual_column_sql_value(Hardware, "allocated_disk_storage")).to eq(11264)
+      end
+    end
+  end
+
+  describe ".used_disk_storage" do
+    let(:hardware) { FactoryGirl.create(:hardware) }
+
+    context "with no disks" do
+      it "bails ruby calculation" do
+        expect(hardware.used_disk_storage).to eq(0) # TODO
+      end
+
+      it "bails database calculation" do
+        hardware
+        expect(virtual_column_sql_value(Hardware, "used_disk_storage")).to be_nil
+      end
+    end
+
+    context "with disks" do
+      before do
+        FactoryGirl.create(:disk, :size_on_disk => 1024, :size => 10240, :hardware => hardware)
+        FactoryGirl.create(:disk, :size => 1024, :hardware => hardware)
+        FactoryGirl.create(:disk, :hardware => hardware)
+      end
+
+      it "calculates in ruby" do
+        expect(hardware.used_disk_storage).to eq(2048)
+      end
+
+      it "calculates in the database" do
+        hardware
+        expect(virtual_column_sql_value(Hardware, "used_disk_storage")).to eq(2048)
       end
     end
   end

@@ -46,6 +46,25 @@ describe ReportController do
         allow(controller).to receive(:build_edit_screen) # Don't actually build the edit screen
       end
 
+      describe "#add_field_to_col_order" do
+        let(:miq_report)               { FactoryGirl.create(:miq_report, :cols => [], :col_order => []) }
+        let(:base_model)               { "Vm" }
+        let(:virtual_custom_attribute) { "virtual_custom_attribute_kubernetes.io/hostname" }
+
+        before do
+          @edit = assigns(:edit)
+          @edit[:new][:sortby1] = S1 # Set an initial sort by col
+          @edit[:new][:sortby2] = S2 # Set no second sort col
+          @edit[:new][:pivot] = ReportController::PivotOptions.new
+          controller.instance_variable_set(:@edit, @edit)
+        end
+
+        it "fills report by passed column" do
+          controller.send(:add_field_to_col_order, miq_report, "#{base_model}-#{virtual_custom_attribute}")
+          expect(miq_report.cols.first).to eq(virtual_custom_attribute)
+        end
+      end
+
       context "handle report fields" do
         it "sets pdf page size" do
           ps = "US-Legal"
@@ -116,8 +135,6 @@ describe ReportController do
           expect(edit_new[:perf_interval]).to eq("daily")
           expect(edit_new[:perf_avgs]).to eq("time_interval")
           expect(edit_new[:tz]).to eq(session[:user_tz])
-          expect(assigns(:edit)[:start_array]).to be_an_instance_of(Array)
-          expect(assigns(:edit)[:end_array]).to be_an_instance_of(Array)
           expect(assigns(:refresh_div)).to eq("form_div")
           expect(assigns(:refresh_partial)).to eq("form")
         end
@@ -153,8 +170,6 @@ describe ReportController do
           expect(edit_new[:perf_target_pct1]).to eq(100)
           expect(edit_new[:perf_limit_val]).to be_nil
           expect(edit[:percent_col]).to be_falsey
-          expect(edit[:start_array]).to be_an_instance_of(Array)
-          expect(edit[:end_array]).to be_an_instance_of(Array)
           expect(assigns(:refresh_div)).to eq("columns_div")
           expect(assigns(:refresh_partial)).to eq("form_columns")
         end
@@ -174,8 +189,6 @@ describe ReportController do
           expect(edit_new[:perf_limit_val]).to eq(100)
           expect(edit_new[:perf_limit_col]).to be_nil
           expect(edit[:percent_col]).to be_truthy
-          expect(edit[:start_array]).to be_an_instance_of(Array)
-          expect(edit[:end_array]).to be_an_instance_of(Array)
           expect(assigns(:refresh_div)).to eq("columns_div")
           expect(assigns(:refresh_partial)).to eq("form_columns")
         end
@@ -252,8 +265,6 @@ describe ReportController do
           expect(edit_new[:perf_interval]).to eq(perf_int)
           expect(edit_new[:perf_start]).to eq(1.day.to_s)
           expect(edit_new[:perf_end]).to eq("0")
-          expect(edit[:start_array]).to be_an_instance_of(Array)
-          expect(edit[:end_array]).to be_an_instance_of(Array)
           expect(assigns(:refresh_div)).to eq("form_div")
           expect(assigns(:refresh_partial)).to eq("form")
         end
@@ -687,38 +698,6 @@ describe ReportController do
           controller.send(:gfv_timeline)
           edit = assigns(:edit)
           expect(edit[:new][:tl_field]).to eq(NOTHING_STRING)
-          expect(edit[:unit1]).to eq(NOTHING_STRING)
-          expect(edit[:unit2]).to eq(NOTHING_STRING)
-          expect(edit[:unit3]).to eq(NOTHING_STRING)
-        end
-
-        it "sets first, second, and third band units" do
-          unit1 = "Hour"
-          controller.instance_variable_set(:@_params, :chosen_unit1 => unit1)
-          controller.send(:gfv_timeline)
-          edit = assigns(:edit)
-          expect(edit[:unit1]).to eq(unit1)
-          expect(edit[:new][:tl_bands][0][:unit]).to eq(unit1)
-          expect(assigns(:refresh_div)).to eq("tl_settings_div")
-          expect(assigns(:refresh_partial)).to eq("form_tl_settings")
-
-          unit2 = "Day"
-          controller.instance_variable_set(:@_params, :chosen_unit2 => unit2)
-          controller.send(:gfv_timeline)
-          edit = assigns(:edit)
-          expect(edit[:unit2]).to eq(unit2)
-          expect(edit[:new][:tl_bands][1][:unit]).to eq(unit2)
-          expect(assigns(:refresh_div)).to eq("tl_settings_div")
-          expect(assigns(:refresh_partial)).to eq("form_tl_settings")
-
-          unit3 = "Week"
-          controller.instance_variable_set(:@_params, :chosen_unit3 => unit3)
-          controller.send(:gfv_timeline)
-          edit = assigns(:edit)
-          expect(edit[:unit3]).to eq(unit3)
-          expect(edit[:new][:tl_bands][2][:unit]).to eq(unit3)
-          expect(assigns(:refresh_div)).to eq("tl_settings_div")
-          expect(assigns(:refresh_partial)).to eq("form_tl_settings")
         end
 
         it "sets event to position at" do
@@ -729,25 +708,6 @@ describe ReportController do
           expect(assigns(:tl_changed)).to be_truthy
         end
 
-        it "sets show event from last (unit)" do
-          unit = "Minutes"
-          controller.instance_variable_set(:@_params, :chosen_last_unit => unit)
-          controller.send(:gfv_timeline)
-          edit_new = assigns(:edit)[:new]
-          expect(edit_new[:tl_last_unit]).to eq(unit)
-          expect(edit_new[:tl_last_time]).to be_nil
-          expect(assigns(:refresh_div)).to eq("tl_settings_div")
-          expect(assigns(:refresh_partial)).to eq("form_tl_settings")
-          expect(assigns(:tl_repaint)).to be_truthy
-        end
-
-        it "sets show event from last (value)" do
-          val = "10"
-          controller.instance_variable_set(:@_params, {:chosen_last_time => val})
-          controller.send(:gfv_timeline)
-          expect(assigns(:edit)[:new][:tl_last_time]).to eq(val)
-          expect(assigns(:tl_repaint)).to be_truthy
-        end
       end
     end
   end

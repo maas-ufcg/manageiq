@@ -12,11 +12,13 @@
 //= require angular-ui-bootstrap
 //= require angular-ui-bootstrap-tpls
 //= require angular-sanitize
+//= require angular.validators
 //= require moment
 //= require moment-strftime/build/moment-strftime.min
 //= require moment-timezone
 //= require sprintf
 //= require numeral
+//= require cable
 //= require miq_api
 //= require rxjs/dist/rx.all
 //= require miq_angular_application
@@ -31,6 +33,7 @@
 //= require miq_browser_detect
 //= require miq_application
 //= require miq_change_stored_password
+//= require miq_qe
 //= require automate_import_export
 //= require dialog_field_refresh
 //= require excanvas
@@ -54,10 +57,10 @@
 //= require bootstrap-hover-dropdown
 //= require bootstrap-switch
 //= require angular-bootstrap-switch
+//= require patternfly-bootstrap-treeview
 //= require jquery.observe_field
 //= require miq_ujs_bindings
-//= require dynatree/jquery.dynatree
-//= require miq_dynatree
+//= require miq_tree
 //= require codemirror
 //= require codemirror/mode/css/css
 //= require codemirror/mode/htmlmixed/htmlmixed
@@ -78,6 +81,8 @@
 //= require miq_c3
 //= require miq_explorer
 //= require qs
+//= require miq_timeline
 // Bower packages
 //= require manageiq-ui-components/dist/js/ui-components
 //= require rx-angular/dist/rx.angular
+//= require patternfly-timeline/dist/timeline

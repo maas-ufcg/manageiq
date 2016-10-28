@@ -34,6 +34,17 @@ module OpsController::OpsRbac
   end
 
   def rbac_user_copy
+    # get users id either from gtl check or detail id
+    user_id = params[:miq_grid_checks].present? ? params[:miq_grid_checks] : params[:id]
+    user = User.find(from_cid(user_id))
+    # check if it is allowed to copy the user
+    if rbac_user_copy_restriction?(user)
+      rbac_restricted_user_copy_flash(user)
+    end
+    if @flash_array
+      javascript_flash
+      return
+    end
     assert_privileges("rbac_user_copy")
     rbac_edit_reset('copy', 'user', User)
   end
@@ -113,7 +124,7 @@ module OpsController::OpsRbac
 
       begin
         tenant.save!
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("Error when adding a new tenant: %{message}") % {:message => bang.message}, :error)
         javascript_flash
       else
@@ -188,7 +199,7 @@ module OpsController::OpsRbac
           tenant_quotas = params[:quotas].deep_symbolize_keys
           tenant.set_quotas(tenant_quotas.to_hash)
         end
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("Error when saving tenant quota: %{message}") % {:message => bang.message}, :error)
         javascript_flash
       else
@@ -532,7 +543,7 @@ module OpsController::OpsRbac
                                                                          @edit[:new][:user_id],
                                                                          @edit[:new][:user_pwd])
         end
-      rescue StandardError => bang
+      rescue => bang
         @edit[:ldap_groups_by_user] = []
         add_flash(_("Error during 'LDAP Group Look Up': %{message}") % {:message => bang.message}, :error)
         render :update do |page|
@@ -559,12 +570,20 @@ module OpsController::OpsRbac
     ["admin", session[:userid]].include?(user.userid)
   end
 
+  def rbac_user_copy_restriction?(user)
+    user.super_admin_user?
+  end
+
   def rbac_restricted_user_delete_flash(user)
-    if user.userid == "admin"
+    if user.super_admin_user?
       add_flash(_("Default %{model} \"%{name}\" cannot be deleted") % {:model => ui_lookup(:model => "User"), :name => user.name}, :error)
     elsif user.userid == session[:userid]
       add_flash(_("Current %{model} \"%{name}\" cannot be deleted") % {:model => ui_lookup(:model => "User"), :name => user.name}, :error)
     end
+  end
+
+  def rbac_restricted_user_copy_flash(user)
+    add_flash(_("Default %{model} \"%{name}\" cannot be copied") % {:model => ui_lookup(:model => "User"), :name => user.name}, :error)
   end
 
   def rbac_edit_tags_reset(tagging)
@@ -788,8 +807,7 @@ module OpsController::OpsRbac
     changed = (@edit[:new] != @edit[:current])
     bad = false
     if rec_type == "group"
-      bad ||= @edit[:new][:role].blank?
-      bad ||= @edit[:new][:group_tenant].blank?
+      bad = (@edit[:new][:role].blank? || @edit[:new][:group_tenant].blank?)
     end
 
     render :update do |page|
@@ -807,7 +825,6 @@ module OpsController::OpsRbac
 
           # Only update description field value if ldap group user field was selected
           page << "$('#description').val('#{j_str(@edit[:new][:description])}');" if params[:ldap_groups_user]
-          page << javascript_for_tree_checkbox_clicked(tree_name) if params[:check] && tree_name
 
           # don't do anything to lookup box when checkboxes on the right side are checked
           page << set_element_visible('group_lookup', @edit[:new][:lookup]) unless params[:check]
@@ -911,7 +928,11 @@ module OpsController::OpsRbac
     [@group.get_managed_filters].flatten.each do |f|
       @filters[f.split("/")[-2] + "-" + f.split("/")[-1]] = f
     end
-    rbac_build_myco_tree                              # Build the MyCompanyTags tree for this user
+    @tags_tree = TreeBuilderTags.new(:tags,
+                                     :tags_tree,
+                                     @sb,
+                                     true,
+                                     :edit => @edit, :filters => @filters, :group => @group)
     @hac_tree = build_belongsto_tree(@belongsto.keys, false, false)  # Build the Hosts & Clusters tree for this user
     @vat_tree = build_belongsto_tree(@belongsto.keys, true, false)  # Build the VMs & Templates tree for this user
   end
@@ -925,23 +946,23 @@ module OpsController::OpsRbac
 
   def rbac_build_features_tree
     @role = @sb[:typ] == "copy" ? @record.dup : @record if @role.nil?     # if on edit screen use @record
-    OpsController::RbacTree.build(@role, @role_features).to_json
+    TreeBuilder.convert_bs_tree(OpsController::RbacTree.build(@role, @role_features, !@edit.nil?)).to_json
   end
 
   # Set form variables for role edit
   def rbac_user_set_form_vars
     @edit = {}
-    @edit[:user_id] = @record.id if @sb[:typ] != "copy"
+    @edit[:user_id] = @record.id unless @sb[:typ] == "copy"
     @user = @sb[:typ] == "copy" ? @record.dup : @record # Save a shadow copy of the record if record is being copied
     @edit[:new] = {}
     @edit[:current] = {}
     @edit[:key] = "rbac_user_edit__#{@edit[:user_id] || "new"}"
 
     @edit[:new][:name] = @user.name
-    @edit[:new][:userid] = @user.userid
+    @edit[:new][:userid] = @user.userid unless @sb[:typ] == "copy"
     @edit[:new][:email] = @user.email.to_s
-    @edit[:new][:password] = @user.password
-    @edit[:new][:verify] = @user.password
+    @edit[:new][:password] = @user.password unless @sb[:typ] == "copy"
+    @edit[:new][:verify] = @user.password unless @sb[:typ] == "copy"
 
     @edit[:groups] = MiqGroup.non_tenant_groups.sort_by { |g| g.description.downcase }.collect { |g| [g.description, g.id] }
     @edit[:new][:group] = @user.current_group ? @user.current_group.id : nil
@@ -1000,12 +1021,14 @@ module OpsController::OpsRbac
     end
 
     if params[:check]                               # User checked/unchecked a tree node
-      if params[:tree_typ] == "myco"                # MyCompany tag checked
+      if params[:tree_typ] == "tags"                # MyCompany tag checked
+        cat, tag = params[:id].split('cl-').last.split("_xx-") # Get the category and tag
+        cat_name = Classification.find_by(:id => from_cid(cat)).name
+        tag_name = Classification.find_by(:id => tag).name
         if params[:check] == "0"                    #   unchecked
-          @edit[:new][:filters].delete(params[:id].split('___').last)   #     Remove the tag from the filters array
+          @edit[:new][:filters].except!("#{cat_name}-#{tag_name}") # Remove the tag from the filters array
         else                                        #   checked
-          cat, tag = params[:id].split('___').last.split("-")         #     Get the category and tag
-          @edit[:new][:filters][params[:id].split('___').last] = "/managed/#{cat}/#{tag}" # Put them in the hash
+          @edit[:new][:filters]["#{cat_name}-#{tag_name}"] = "/managed/#{cat_name}/#{tag_name}" # Put them in the hash
         end
       else                                          # Belongsto tag checked
         if params[:check] == "0"                    #   unchecked
@@ -1048,7 +1071,6 @@ module OpsController::OpsRbac
       @edit[:new][:belongsto][bobj.class.to_s + "_" + bobj.id.to_s] = b # Store in hash as <class>_<id> string
     end
 
-    #   user_build_myco_tree                              # Build the MyCompanyTags tree for this user
     #   user_build_belongsto_tree                         # Build the Hosts & Clusters tree for this user
     #   user_build_belongsto_tree(true)                   # Build the VMs & Templates tree for this user
 
@@ -1076,45 +1098,13 @@ module OpsController::OpsRbac
     @edit[:new][:group_tenant] = @group.tenant_id
 
     @edit[:current] = copy_hash(@edit[:new])
-    rbac_build_myco_tree                              # Build the MyCompanyTags tree for this user
+    @tags_tree = TreeBuilderTags.new(:tags,
+                                     :tags_tree,
+                                     @sb,
+                                     true,
+                                     :edit => @edit, :filters => @filters, :group => @group)
     @hac_tree = build_belongsto_tree(@edit[:new][:belongsto].keys, false, false)  # Build the Hosts & Clusters tree for this user
     @vat_tree = build_belongsto_tree(@edit[:new][:belongsto].keys, true, false)  # Build the VMs & Templates tree for this user
-  end
-
-  # Build the MyCompany Tags tree
-  def rbac_build_myco_tree
-    cats = []                            # Array of categories
-    categories = Classification.categories.collect { |c| c unless !c.show || ["folder_path_blue", "folder_path_yellow"].include?(c.name) }.compact
-    categories.sort_by { |c| c.description.downcase }.each do |category|
-      kids_checked = false
-      cat_node = {}
-      cat_node[:key] = category.name
-      cat_node[:title] = category.description
-      cat_node[:tooltip] =  _("Category: %{description}") % {:description => category.description}
-      cat_node[:addClass] = "cfme-no-cursor-node"      # No cursor pointer
-      cat_node[:icon] = ActionController::Base.helpers.image_path('100/folder.png')
-      cat_node[:hideCheckbox] = true
-      cat_kids = []
-      category.entries.sort_by { |e| e.description.downcase }.each do |tag|
-        tag_node = {}
-        tag_node[:key] = [category.name, tag.name].join("-")
-        tag_node[:title] = tag.description
-        tag_node[:tooltip] =  _("Tag: %{description}") % {:description => tag.description}
-        if (@edit && @edit[:new][:filters][tag_node[:key]] == @edit[:current][:filters][tag_node[:key]]) || ![tag_node[:key]].include?(@filters) # Check new vs current
-          tag_node[:addClass] = "cfme-no-cursor-node"       # No cursor pointer
-        else
-          tag_node[:addClass] = "cfme-blue-node"            # Show node as different
-        end
-        tag_node[:icon] = ActionController::Base.helpers.image_path('100/tag.png')
-        tag_node[:select] = true if (@edit && @edit[:new][:filters].key?(tag_node[:key])) || (@filters && @filters.key?(tag_node[:key])) # Check if tag is assigned
-        kids_checked = true if tag_node[:select] == true
-        cat_kids.push(tag_node)
-      end
-      cat_node[:children] = cat_kids unless cat_kids.empty?
-      cat_node[:expand] = true if kids_checked
-      cats.push(cat_node) unless cat_kids.empty?
-    end
-    @myco_tree = cats.to_json.html_safe # Add cats node array to root of tree
   end
 
   # Set group record variables to new values

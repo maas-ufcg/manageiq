@@ -2,18 +2,16 @@
 if (! window.ManageIQ) {
   window.ManageIQ = {
     actionUrl: null, // action URL used in JS function miqGridSort
+    afterOnload: null, // JS code to be evaluated after onload
     angular: {
       app: null, // angular application
       scope: null,  // helper scope, pending refactor
       rxSubject: null,  // an observable
+      eventNotificationsData: null, // used by the notification drawer
     },
     browser: null, // browser name
     controller: null, // stored controller, used to build URL
     changes: null, // indicate if there are unsaved changes
-    dynatree: {
-      clickUrl: null,
-      checkUrl: null,
-    },
     editor: null, // instance of CodeMirror editor
     timelineFilter: null, //
     toolbars: null, // toolbars
@@ -70,11 +68,18 @@ if (! window.ManageIQ) {
     },
     tree: {
       expandAll: true,
+      clickUrl: null,
+      checkUrl: null
     },
     gridChecks: [], // list of checked checkboxes in current list grid
     observe: { // keeping track of data-miq_observe requests
       processing: false, // is a request currently being processed?
       queue: [], // a queue of pending requests
+    },
+    qe: {
+      autofocus: 0, // counter of pending autofocus fields
+      debounced: {}, // running debounces
+      debounce_counter: 1,
     },
   };
 }

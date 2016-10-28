@@ -58,7 +58,7 @@ class EvmDatabaseOps
         _log.info("[#{db_opts[:dbname]}] with database size: [#{db_size} bytes], free space at [#{db_opts[:local_file]}]: [#{free_space} bytes]")
       else
         msg = "Destination location: [#{db_opts[:local_file]}], does not have enough free disk space: [#{free_space} bytes] for database of size: [#{db_size} bytes]"
-        _log.warn("#{msg}")
+        _log.warn(msg)
         MiqEvent.raise_evm_event_queue(MiqServer.my_server, "evm_server_db_backup_low_space", :event_details => msg)
         raise MiqException::MiqDatabaseBackupInsufficientSpace, msg
       end
@@ -123,8 +123,6 @@ class EvmDatabaseOps
     PostgresAdmin.start(DEFAULT_OPTS)
   end
 
-  private
-
   def self.upload(connect_opts, local_file, destination_file)
     MiqGenericMountSession.in_depot_session(connect_opts) { |session| session.upload(local_file, destination_file) }
     destination_file
@@ -139,4 +137,5 @@ class EvmDatabaseOps
     time_suffix  = Time.now.utc.strftime("%Y%m%d_%H%M%S")
     "#{BACKUP_TMP_FILE}_#{time_suffix}"
   end
+  private_class_method :backup_file_name
 end

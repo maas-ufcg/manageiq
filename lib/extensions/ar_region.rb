@@ -4,6 +4,9 @@ module ArRegion
   extend ActiveSupport::Concern
 
   DEFAULT_RAILS_SEQUENCE_FACTOR = 1_000_000_000_000
+  COMPRESSED_ID_SEPARATOR = 'r'.freeze
+  CID_OR_ID_MATCHER = "\\d+?(#{COMPRESSED_ID_SEPARATOR}\\d+)?".freeze
+  RE_COMPRESSED_ID = /^(\d+)#{COMPRESSED_ID_SEPARATOR}(\d+)$/
 
   included do
     cache_with_timeout(:id_to_miq_region) { Hash.new }
@@ -80,8 +83,7 @@ module ArRegion
 
     def split_id(id)
       return [my_region_number, nil] if id.nil?
-      id = uncompress_id(id) if compressed_id?(id)
-      id = id.to_i
+      id = uncompress_id(id)
 
       region_number = id_to_region(id)
       short_id      = (region_number == 0) ? id : id % (region_number * rails_sequence_factor)
@@ -93,10 +95,8 @@ module ArRegion
     # ID compression
     #
 
-    COMPRESSED_ID_SEPARATOR = 'r'
-    RE_COMPRESSED_ID = /^(\d+)#{COMPRESSED_ID_SEPARATOR}(\d+)$/
     def compressed_id?(id)
-      id.to_s =~ RE_COMPRESSED_ID
+      id.to_s =~ /^#{CID_OR_ID_MATCHER}$/
     end
 
     def compress_id(id)
@@ -122,6 +122,10 @@ module ArRegion
     # Partition the passed ids into local and remote sets
     def partition_ids_by_remote_region(ids)
       ids.partition { |id| self.id_in_current_region?(id) }
+    end
+
+    def group_ids_by_region(ids)
+      ids.group_by { |id| id_to_region(id) }
     end
 
     def region_number_from_sequence

@@ -127,11 +127,7 @@
     :refresh_interval: 15.minutes
   :openshift:
     :refresh_interval: 15.minutes
-  :atomic:
-    :refresh_interval: 15.minutes
   :openshift_enterprise:
-    :refresh_interval: 15.minutes
-  :atomic_enterprise:
     :refresh_interval: 15.minutes
   :raise_vm_snapshot_complete_if_created_within: 15.minutes
   :refresh_interval: 24.hours
@@ -903,10 +899,21 @@
 :host_scan:
   :queue_timeout: 20.minutes
 :http_proxy:
-  :host:
-  :password:
-  :port:
-  :user:
+  :default:
+    :host:
+    :password:
+    :port:
+    :user:
+  :azure:
+    :host:
+    :password:
+    :port:
+    :user:
+  :ec2:
+    :host:
+    :password:
+    :port:
+    :user:
 :ldap_synchronization:
   :ldap_synchronization_schedule: "0 2 * * *"
 :log:
@@ -933,6 +940,8 @@
   :level_rails: info
   :level_aws: info
   :level_aws_in_evm: error
+  :level_azure: warn
+  :level_azure_in_evm: error
   :level_mw: info
   :level_mw_in_evm: error
   :level_kube: info
@@ -976,6 +985,7 @@
     :purge_window_size: 1000
 :product:
   :maindb: ExtManagementSystem
+  :container_deployment_wizard: false
 :replication:
   :exclude_tables:
     - ar_internal_metadata
@@ -1221,6 +1231,13 @@
         :flooding_monitor_enabled: true
         :poll: 1.seconds
         :ems_event_max_wait: 60
+      :event_catcher_vmware_cloud:
+        :poll: 15.seconds
+        :duration: 10.seconds
+        :capacity: 50
+        :amqp_port: 5672
+        :amqp_heartbeat: 30
+        :amqp_recovery_attempts: 4
       :event_catcher_openstack:
         :poll: 15.seconds
         :topics:
@@ -1273,12 +1290,14 @@
         :poll: 1.seconds
       :event_catcher_openshift:
         :poll: 1.seconds
-      :event_catcher_atomic:
-        :poll: 1.seconds
       :event_catcher_openshift_enterprise:
         :poll: 1.seconds
       :event_catcher_atomic_enterprise:
         :poll: 1.seconds
+      :event_catcher_cinder:
+        :poll: 10.seconds
+      :event_catcher_swift:
+        :poll: 10.seconds
     :queue_worker_base:
       :defaults:
         :cpu_usage_threshold: 100.percent
@@ -1293,8 +1312,6 @@
           :poll_method: :escalate
         :ems_metrics_collector_worker_azure: {}
         :ems_metrics_collector_worker_amazon: {}
-        :ems_metrics_collector_worker_atomic: {}
-        :ems_metrics_collector_worker_atomic_enterprise: {}
         :ems_metrics_collector_worker_google: {}
         :ems_metrics_collector_worker_kubernetes:
           :metrics_port: 5000
@@ -1322,8 +1339,6 @@
         :ems_refresh_worker_amazon: {}
         :ems_refresh_worker_amazon_network: {}
         :ems_refresh_worker_ansible_tower_configuration: {}
-        :ems_refresh_worker_atomic: {}
-        :ems_refresh_worker_atomic_enterprise: {}
         :ems_refresh_worker_azure: {}
         :ems_refresh_worker_azure_network: {}
         :ems_refresh_worker_foreman_configuration: {}
@@ -1343,6 +1358,8 @@
         :ems_refresh_worker_vmware: {}
         :ems_refresh_worker_vmware_cloud: {}
         :ems_refresh_worker_vmware_cloud_network: {}
+        :ems_refresh_worker_cinder: {}
+        :ems_refresh_worker_swift: {}
       :event_handler:
         :cpu_usage_threshold: 0.percent
         :nice_delta: 7
@@ -1391,6 +1408,7 @@
       :memory_threshold: 300.megabytes
       :nice_delta: 3
       :orchestration_stack_retired_interval: 10.minutes
+      :load_balancer_retired_interval: 10.minutes
       :performance_collection_interval: 3.minutes
       :performance_collection_start_delay: 5.minutes
       :performance_realtime_purging_interval: 15.minutes
@@ -1406,6 +1424,8 @@
       :storage_file_collection_interval: 1.days
       :storage_file_collection_time_utc: 21600
       :vm_retired_interval: 10.minutes
+      :chargeback_generation_time_utc: 01:00:00
+      :chargeback_generation_interval: 1.day
     :smis_refresh_worker:
       :memory_threshold: 1.gigabytes
       :nice_delta: 3

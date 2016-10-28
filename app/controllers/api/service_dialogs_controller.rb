@@ -1,30 +1,8 @@
 module Api
   class ServiceDialogsController < BaseController
-    def show
-      @additional_attributes = %w(content) if attribute_selection == "all"
-      super
-    end
+    before_action :set_additional_attributes, :only => [:show]
 
-    #
-    # Virtual attribute accessors
-    #
-    def fetch_service_dialogs_content(resource)
-      case @req.collection
-      when "service_templates"
-        service_template = parent_resource_obj
-      when "services"
-        service_template = parent_resource_obj.service_template
-      end
-      return resource.content if service_template.nil?
-      resource_action = service_template.resource_actions.where(:dialog_id => resource.id).first
-      if resource_action.nil?
-        raise BadRequestError,
-              "#{service_dialog_ident(resource)} is not referenced by #{service_template_ident(service_template)}"
-      end
-      resource.content(service_template, resource_action)
-    end
-
-    def refresh_dialog_fields_resource_service_dialogs(type, id = nil, data = nil)
+    def refresh_dialog_fields_resource(type, id = nil, data = nil)
       raise BadRequestError, "Must specify an id for Reconfiguring a #{type} resource" unless id
 
       api_action(type, id) do |klass|
@@ -36,6 +14,10 @@ module Api
     end
 
     private
+
+    def set_additional_attributes
+      @additional_attributes = %w(content) if attribute_selection == "all"
+    end
 
     def refresh_dialog_fields_service_dialog(service_dialog, data)
       data ||= {}

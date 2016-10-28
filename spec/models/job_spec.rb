@@ -242,11 +242,6 @@ describe Job do
 
           assert_queue_message
         end
-
-        # it "should deliver message without error" do
-        #   Host.any_instance.stub(:miq_proxy).and_return(@miq_server)
-        #   lambda { MiqQueue.first.deliver }.should_not raise_error
-        # end
       end
     end
 
@@ -260,7 +255,7 @@ describe Job do
           :container_image, :ext_management_system => @ems_k8s, :name => 'test',
           :image_ref => "docker://3629a651e6c11d7435937bdf41da11cf87863c03f2587fa788cf5cbfe8a11b9a"
         )
-        @image_scan_job = @image.scan
+        @image_scan_job = @image.ext_management_system.raw_scan_job_create(@image)
       end
 
       context "#target_entity" do

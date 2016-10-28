@@ -10,6 +10,11 @@ module MiqAeMethodService
 
   class MiqAeServiceFront
     include DRbUndumped
+    attr_accessor :workspace
+    def initialize(workspace)
+      @workspace = workspace
+    end
+
     def find(id)
       MiqAeService.find(id)
     end
@@ -224,6 +229,9 @@ module MiqAeMethodService
     end
 
     def execute(m, *args)
+      # Since each request from DRb client could run in a separate thread
+      # We have to set the current_user in every thread.
+      User.current_user = @workspace.ae_user
       MiqAeServiceMethods.send(m, *args)
     rescue NoMethodError => err
       raise MiqAeException::MethodNotFound, err.message

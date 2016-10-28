@@ -22,12 +22,26 @@ RSpec.describe 'Arbitration Rule API' do
     end
   end
 
+  context 'GET /api/arbitration_rules/:id' do
+    it 'shows an arbitration rule' do
+      rule = FactoryGirl.create(:arbitration_rule)
+      api_basic_authorize collection_action_identifier(:arbitration_rules, :read, :get)
+
+      run_get arbitration_rules_url(rule.id)
+
+      expect(response.parsed_body).to include('href' => a_string_including(arbitration_rules_url(rule.id)))
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
   context 'arbitration rules create' do
+    let(:profile) { FactoryGirl.create(:arbitration_profile) }
     let(:request_body) do
       {
-        'name'       => 'admin rule',
-        'operation'  => 'inject',
-        'expression' => {
+        'description'            => 'admin rule',
+        'operation'              => 'inject',
+        'arbitration_profile_id' => profile.id,
+        'expression'             => {
           'EQUAL' => {
             'field' => 'User-userid',
             'value' => 'admin'
@@ -42,14 +56,28 @@ RSpec.describe 'Arbitration Rule API' do
       expect do
         run_post(arbitration_rules_url, gen_request(:create, request_body))
       end.to change(ArbitrationRule, :count).by(1)
+      expect(response).to have_http_status(:ok)
     end
 
     it 'supports multiple arbitration_rule creation' do
       api_basic_authorize collection_action_identifier(:arbitration_rules, :create)
 
+      expected = {
+        'results' => a_collection_containing_exactly(
+          a_hash_including('description'            => 'admin rule',
+                           'operation'              => 'inject',
+                           'arbitration_profile_id' => profile.id),
+          a_hash_including('description'            => 'admin rule',
+                           'operation'              => 'inject',
+                           'arbitration_profile_id' => profile.id)
+        )
+      }
+
       expect do
         run_post(arbitration_rules_url, gen_request(:create, [request_body, request_body]))
       end.to change(ArbitrationRule, :count).by(2)
+      expect(response.parsed_body).to include(expected)
+      expect(response).to have_http_status(:ok)
     end
 
     it 'rejects a request with an id' do
@@ -58,6 +86,7 @@ RSpec.describe 'Arbitration Rule API' do
       run_post(arbitration_rules_url(999_999), request_body.merge(:id => 999_999))
 
       expect_bad_request(/Unsupported Action create for the arbitration_rules resource/)
+      expect(response).to have_http_status(:bad_request)
     end
   end
 
@@ -67,7 +96,7 @@ RSpec.describe 'Arbitration Rule API' do
     it 'rejects edit without an appropriate role' do
       api_basic_authorize
 
-      run_post(arbitration_rules_url(rule.id), gen_request(:edit, :name => 'edited name'))
+      run_post(arbitration_rules_url(rule.id), gen_request(:edit, :description => 'edited description'))
 
       expect(response).to have_http_status(:forbidden)
     end
@@ -75,9 +104,18 @@ RSpec.describe 'Arbitration Rule API' do
     it 'can edit a setting' do
       api_basic_authorize collection_action_identifier(:arbitration_rules, :edit)
 
+      expected = {
+        'href'        => a_string_including(arbitration_rules_url(rule.id)),
+        'id'          => rule.id,
+        'description' => 'edited description',
+        'operation'   => 'inject'
+      }
+
       expect do
-        run_post(arbitration_rules_url(rule.id), gen_request(:edit, :name => 'edited name'))
-      end.to change { rule.reload.name }.to('edited name')
+        run_post(arbitration_rules_url(rule.id), gen_request(:edit, :description => 'edited description'))
+      end.to change { rule.reload.description }.to('edited description')
+      expect(response.parsed_body).to include(expected)
+      expect(response).to have_http_status(:ok)
     end
   end
 
@@ -89,6 +127,7 @@ RSpec.describe 'Arbitration Rule API' do
       expect do
         run_delete(arbitration_rules_url(rule.id))
       end.to change(ArbitrationRule, :count).by(-1)
+      expect(response).to have_http_status(:no_content)
     end
 
     it 'supports multiple arbitration rule delete' do
@@ -99,6 +138,28 @@ RSpec.describe 'Arbitration Rule API' do
       expect do
         run_post(arbitration_rules_url, gen_request(:delete, hrefs))
       end.to change(ArbitrationRule, :count).by(-2)
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
+  context 'OPTIONS /api/arbitration_rules' do
+    it 'returns arbitration rule field_values' do
+      api_basic_authorize
+
+      attributes = (ArbitrationRule.attribute_names - ArbitrationRule.virtual_attribute_names).sort.as_json
+      reflections = (ArbitrationRule.reflections.keys | ArbitrationRule.virtual_reflections.keys.collect(&:to_s)).sort
+      expected = {
+        'attributes'         => attributes,
+        'virtual_attributes' => ArbitrationRule.virtual_attribute_names.sort.as_json,
+        'relationships'      => reflections,
+        'data'               => {
+          'field_values' => ArbitrationRule.field_values
+        }
+      }
+
+      run_options(arbitration_rules_url)
+      expect(response.parsed_body).to eq(expected)
+      expect(response.headers['Access-Control-Allow-Methods']).to include('OPTIONS')
     end
   end
 end

@@ -110,14 +110,6 @@ class ConfigurationController < ApplicationController
     @changed = false unless @changed
     render :update do |page|
       page << javascript_prologue
-      @edit[:current].each_with_index do |filter, i|
-        style_class = if filter[:search_key] != @edit[:new][i][:search_key]
-                        'cfme-blue-bold-node'
-                      else
-                        'dynatree-title'
-        end
-        page << "miqDynatreeNodeAddClass('df_tree', $('[id$=\"-#{filter[:id]}\"]'), '#{style_class}')"
-      end
       page << javascript_for_miq_button_visibility(@changed)
     end
   end
@@ -418,7 +410,7 @@ class ConfigurationController < ApplicationController
       @timeprofile.rollup_daily_metrics = params[:rollup_daily]
       begin
         @timeprofile.save!
-      rescue StandardError => bang
+      rescue => bang
         add_flash(_("TimeProfile \"%{name}\": Error during 'save': %{error_message}") %
                       {:name => @timeprofile.description, :error_message => bang.message}, :error)
         @in_a_form = true

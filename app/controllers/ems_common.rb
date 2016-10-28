@@ -70,6 +70,9 @@ module EmsCommon
     {
       "instances"                     => [ManageIQ::Providers::CloudManager::Vm, _("Instances")],
       "images"                        => [ManageIQ::Providers::CloudManager::Template, _("Images")],
+      "storage_managers"              => [ManageIQ::Providers::StorageManager,
+                                          _("Storage Managers"),
+                                          :storage_managers],
       "miq_templates"                 => [MiqTemplate,            _("Templates")],
       "vms"                           => [Vm,                     _("VMs")],
       "orchestration_stacks"          => [OrchestrationStack,     _("Stacks")],
@@ -78,7 +81,7 @@ module EmsCommon
       'containers'                    => [Container,              _('Containers')],
       'container_replicators'         => [ContainerReplicator,    _('Container Replicators')],
       'container_nodes'               => [ContainerNode,          _('Container Nodes')],
-      'container_groups'              => [ContainerGroup,         _('Container Groups')],
+      'container_groups'              => [ContainerGroup,         _('Pods')],
       'container_services'            => [ContainerService,       _('Container Services')],
       'container_images'              => [ContainerImage,         _('Container Images')],
       'container_routes'              => [ContainerRoute,         _('Container Routes')],
@@ -86,6 +89,7 @@ module EmsCommon
       'container_projects'            => [ContainerProject,       _('Container Projects')],
       'container_image_registries'    => [ContainerImageRegistry, _('Container Image Registries')],
       'availability_zones'            => [AvailabilityZone,       _('Availability Zones')],
+      'host_aggregates'               => [HostAggregate,          _('Host Aggregates')],
       'middleware_servers'            => [MiddlewareServer,       _('Middleware Servers')],
       'middleware_deployments'        => [MiddlewareDeployment,   _('Middleware Deployments')],
       'middleware_datasources'        => [MiddlewareDatasource,   _('Middleware Datasources')],
@@ -429,6 +433,9 @@ module EmsCommon
       when "host_refresh"                     then refreshhosts
       when "host_scan"                        then scanhosts
       when "host_tag"                         then tag(Host)
+      when "host_manageable"                  then sethoststomanageable
+      when "host_introspect"                  then introspecthosts
+      when "host_provide"                     then providehosts
       # Storages
       when "storage_delete"                   then deletestorages
       when "storage_refresh"                  then refreshstorage
@@ -863,12 +870,8 @@ module EmsCommon
         @edit[:new][:port] = @ems.port ? @ems.port : ManageIQ::Providers::Kubernetes::ContainerManager::DEFAULT_PORT
       elsif params[:server_emstype] == ManageIQ::Providers::Openshift::ContainerManager.ems_type
         @edit[:new][:port] = @ems.port ? @ems.port : ManageIQ::Providers::Openshift::ContainerManager::DEFAULT_PORT
-      elsif params[:server_emstype] == ManageIQ::Providers::Atomic::ContainerManager.ems_type
-        @edit[:new][:port] = @ems.port ? @ems.port : ManageIQ::Providers::Atomic::ContainerManager::DEFAULT_PORT
       elsif params[:server_emstype] == ManageIQ::Providers::OpenshiftEnterprise::ContainerManager.ems_type
         @edit[:new][:port] = @ems.port ? @ems.port : ManageIQ::Providers::OpenshiftEnterprise::ContainerManager::DEFAULT_PORT
-      elsif params[:server_emstype] == ManageIQ::Providers::AtomicEnterprise::ContainerManager.ems_type
-        @edit[:new][:port] = @ems.port ? @ems.port : ManageIQ::Providers::AtomicEnterprise::ContainerManager::DEFAULT_PORT
       else
         @edit[:new][:port] = nil
       end
@@ -965,15 +968,16 @@ module EmsCommon
 
     if task == "refresh_ems"
       model.refresh_ems(emss, true)
-      add_flash(n_("%{task} initiated for %{count} %{model} from the CFME Database",
-                   "%{task} initiated for %{count} %{models} from the CFME Database", emss.length) % \
-        {:task   => task_name(task).gsub("Ems", ui_lookup(:tables => @table_name)),
-         :count  => emss.length,
-         :model  => ui_lookup(:table => @table_name),
-         :models => ui_lookup(:tables => @table_name)})
+      add_flash(n_("%{task} initiated for %{count} %{model} from the %{product} Database",
+                   "%{task} initiated for %{count} %{models} from the %{product} Database", emss.length) % \
+        {:task    => task_name(task).gsub("Ems", ui_lookup(:tables => @table_name)),
+         :count   => emss.length,
+         :product => I18n.t('product.name'),
+         :model   => ui_lookup(:table => @table_name),
+         :models  => ui_lookup(:tables => @table_name)})
       AuditEvent.success(:userid => session[:userid], :event => "#{@table_name}_#{task}",
           :message => _("'%{task}' successfully initiated for %{table}") %
-            {:task => task, :table => pluralize(emss.length, "#{ui_lookup(:tables => @table_name)}")},
+            {:task => task, :table => pluralize(emss.length, ui_lookup(:tables => @table_name).to_s)},
           :target_class => model.to_s)
     elsif task == "destroy"
       model.where(:id => emss).order("lower(name)").each do |ems|
@@ -987,11 +991,12 @@ module EmsCommon
         AuditEvent.success(audit)
       end
       model.destroy_queue(emss)
-      add_flash(n_("Delete initiated for %{count} %{model} from the CFME Database",
-                   "Delete initiated for %{count} %{models} from the CFME Database", emss.length) %
-        {:count  => emss.length,
-         :model  => ui_lookup(:table => @table_name),
-         :models => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
+      add_flash(n_("Delete initiated for %{count} %{model} from the %{product} Database",
+                   "Delete initiated for %{count} %{models} from the %{product} Database", emss.length) %
+        {:count   => emss.length,
+         :product => I18n.t('product.name'),
+         :model   => ui_lookup(:table => @table_name),
+         :models  => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
     else
       model.where(:id => emss).order("lower(name)").each do |ems|
         id = ems.id
@@ -1004,7 +1009,7 @@ module EmsCommon
         end
         begin
           ems.send(task.to_sym) if ems.respond_to?(task)    # Run the task
-        rescue StandardError => bang
+        rescue => bang
           add_flash(_("%{model} \"%{name}\": Error during '%{task}': %{error_message}") %
             {:model => model.to_s, :name => ems_name, :task => task, :error_message => bang.message}, :error)
           AuditEvent.failure(:userid => session[:userid], :event => "#{@table_name}_#{task}",
@@ -1039,11 +1044,12 @@ module EmsCommon
         add_flash(_("No %{record} were selected for deletion") % {:record => ui_lookup(:table => @table_name)}, :error)
       end
       process_emss(emss, "destroy") unless emss.empty?
-      add_flash(n_("Delete initiated for %{count} %{model} from the CFME Database",
-                   "Delete initiated for %{count} %{models} from the CFME Database", emss.length) %
-        {:count  => emss.length,
-         :model  => ui_lookup(:table => @table_name),
-         :models => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
+      add_flash(n_("Delete initiated for %{count} %{model} from the %{product} Database",
+                   "Delete initiated for %{count} %{models} from the %{product} Database", emss.length) %
+        {:count   => emss.length,
+         :product => I18n.t('product.name'),
+         :model   => ui_lookup(:table => @table_name),
+         :models  => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
     else # showing 1 ems, scan it
       if params[:id].nil? || model.find_by_id(params[:id]).nil?
         add_flash(_("%{record} no longer exists") % {:record => ui_lookup(:table => @table_name)}, :error)
@@ -1071,11 +1077,12 @@ module EmsCommon
         add_flash(_("No %{model} were selected for scanning") % {:model => ui_lookup(:table => @table_name)}, :error)
       end
       process_emss(emss, "scan")  unless emss.empty?
-      add_flash(n_("Analysis initiated for %{count} %{model} from the CFME Database",
-                   "Analysis initiated for %{count} %{models} from the CFME Database", emss.length) %
-        {:count  => emss.length,
-         :model  => ui_lookup(:table => @table_name),
-         :models => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
+      add_flash(n_("Analysis initiated for %{count} %{model} from the %{product} Database",
+                   "Analysis initiated for %{count} %{models} from the %{product} Database", emss.length) %
+        {:count   => emss.length,
+         :product => I18n.t('product.name'),
+         :model   => ui_lookup(:table => @table_name),
+         :models  => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
       show_list
       @refresh_partial = "layouts/gtl"
     else # showing 1 ems, scan it
@@ -1085,11 +1092,12 @@ module EmsCommon
         emss.push(params[:id])
       end
       process_emss(emss, "scan")  unless emss.empty?
-      add_flash(n_("Analysis initiated for %{count} %{model} from the CFME Database",
-                   "Analysis initiated for %{count} %{models} from the CFME Database", emss.length) %
-        {:count  => emss.length,
-         :model  => ui_lookup(:table => @table_name),
-         :models => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
+      add_flash(n_("Analysis initiated for %{count} %{model} from the %{product} Database",
+                   "Analysis initiated for %{count} %{models} from the %{product} Database", emss.length) %
+        {:count   => emss.length,
+         :product => I18n.t('product.name'),
+         :model   => ui_lookup(:table => @table_name),
+         :models  => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
       params[:display] = @display
       show
       if ["vms", "hosts", "storages"].include?(@display)
@@ -1110,11 +1118,12 @@ module EmsCommon
         add_flash(_("No %{model} were selected for refresh") % {:model => ui_lookup(:table => @table_name)}, :error)
       end
       process_emss(emss, "refresh_ems") unless emss.empty?
-      add_flash(n_("Refresh initiated for %{count} %{model} from the CFME Database",
-                   "Refresh initiated for %{count} %{models} from the CFME Database", emss.length) %
-        {:count  => emss.length,
-         :model  => ui_lookup(:table => @table_name),
-         :models => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
+      add_flash(n_("Refresh initiated for %{count} %{model} from the %{product} Database",
+                   "Refresh initiated for %{count} %{models} from the %{product} Database", emss.length) %
+        {:count   => emss.length,
+         :product => I18n.t('product.name'),
+         :model   => ui_lookup(:table => @table_name),
+         :models  => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
       show_list
       @refresh_partial = "layouts/gtl"
     else # showing 1 ems, scan it
@@ -1124,11 +1133,12 @@ module EmsCommon
         emss.push(params[:id])
       end
       process_emss(emss, "refresh_ems") unless emss.empty?
-      add_flash(n_("Refresh initiated for %{count} %{model} from the CFME Database",
-                   "Refresh initiated for %{count} %{models} from the CFME Database", emss.length) %
-        {:count  => emss.length,
-         :model  => ui_lookup(:table => @table_name),
-         :models => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
+      add_flash(n_("Refresh initiated for %{count} %{model} from the %{product} Database",
+                   "Refresh initiated for %{count} %{models} from the %{product} Database", emss.length) %
+        {:count   => emss.length,
+         :product => I18n.t('product.name'),
+         :model   => ui_lookup(:table => @table_name),
+         :models  => ui_lookup(:tables => @table_name)}) if @flash_array.nil?
       params[:display] = @display
       show
       if ["vms", "hosts", "storages"].include?(@display)

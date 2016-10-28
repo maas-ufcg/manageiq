@@ -88,6 +88,8 @@ class MiqExpression
     containers
     container_groups
     container_projects
+    container_images
+    container_nodes
     customization_scripts
     customization_script_media
     customization_script_ptables
@@ -256,6 +258,7 @@ class MiqExpression
     'ManageIQ::Providers::CloudManager::Vm'       => 'vm',
     'ManageIQ::Providers::InfraManager::Vm'       => 'vm',
     'ManageIQ::Providers::PhInfraManager::Vm'       => 'vm',
+    'ContainerProject'                            => 'container_project'
   }
   EXCLUDE_FROM_RELATS = {
     "ManageIQ::Providers::CloudManager" => ["hosts", "ems_clusters", "resource_pools"]
@@ -343,6 +346,18 @@ class MiqExpression
   def initialize(exp, ctype = nil)
     @exp = exp
     @context_type = ctype
+
+    load_virtual_custom_attributes
+  end
+
+  def load_virtual_custom_attributes
+    return unless @exp
+
+    custom_attributes_group_by_model = custom_attribute_columns_and_models.compact.group_by { |x| x[:model] }
+
+    custom_attributes_group_by_model.each do |model, custom_attribute|
+      model.load_custom_attributes_for(custom_attribute.map { |x| x[:column] })
+    end
   end
 
   def self.proto?
@@ -456,22 +471,14 @@ class MiqExpression
       col_type = get_col_type(exp[operator]["field"]) if exp[operator]["field"]
       col_name = exp[operator]["field"]
       col_ruby, = operands2rubyvalue(operator, {"field" => col_name}, context_type)
-      val = RelativeDatetime.normalize(exp[operator]["value"], tz, "beginning", col_type == :date)
-      clause = if col_type == :date
-                 "val=#{col_ruby}; !val.nil? && val.to_date < #{quote(val, col_type)}"
-               else
-                 "val=#{col_ruby}; !val.nil? && val.to_time < #{quote(val, col_type)}"
-               end
+      val = exp[operator]["value"]
+      clause = ruby_for_date_compare(col_ruby, col_type, tz, "<", val)
     when "after"
       col_type = get_col_type(exp[operator]["field"]) if exp[operator]["field"]
       col_name = exp[operator]["field"]
       col_ruby, = operands2rubyvalue(operator, {"field" => col_name}, context_type)
-      val = RelativeDatetime.normalize(exp[operator]["value"], tz, "end", col_type == :date)
-      clause = if col_type == :date
-                 "val=#{col_ruby}; !val.nil? && val.to_date > #{quote(val, col_type)}"
-               else
-                 "val=#{col_ruby}; !val.nil? && val.to_time > #{quote(val, col_type)}"
-               end
+      val = exp[operator]["value"]
+      clause = ruby_for_date_compare(col_ruby, col_type, tz, nil, nil, ">", val)
     when "includes all"
       operands = operands2rubyvalue(operator, exp[operator], context_type)
       clause = "(#{operands[0]} & #{operands[1]}) == #{operands[1]}"
@@ -529,41 +536,18 @@ class MiqExpression
       col_ruby, dummy = operands2rubyvalue(operator, {"field" => col_name}, context_type)
       col_type = get_col_type(col_name)
       value = exp[operator]["value"]
-      start_val = RelativeDatetime.normalize(value, tz, "beginning", col_type == :date)
-      end_val = RelativeDatetime.normalize(value, tz, "end", col_type == :date)
-      if col_type == :date
-        if RelativeDatetime.relative?(value)
-          start_val = quote(start_val, col_type)
-          end_val   = quote(end_val, col_type)
-          clause    = "val=#{col_ruby}; !val.nil? && val.to_date >= #{start_val} && val.to_date <= #{end_val}"
-        else
-          value  = quote(start_val, col_type)
-          clause = "val=#{col_ruby}; !val.nil? && val.to_date == #{value}"
-        end
-      else
-        start_val = quote(start_val, col_type)
-        end_val   = quote(end_val, col_type)
-        clause    = "val=#{col_ruby}; !val.nil? && val.to_time >= #{start_val} && val.to_time <= #{end_val}"
-      end
+      clause = if col_type == :date && !RelativeDatetime.relative?(value)
+                 ruby_for_date_compare(col_ruby, col_type, tz, "==", value)
+               else
+                 ruby_for_date_compare(col_ruby, col_type, tz, ">=", value, "<=", value)
+               end
     when "from"
       col_name = exp[operator]["field"]
       col_ruby, dummy = operands2rubyvalue(operator, {"field" => col_name}, context_type)
       col_type = get_col_type(col_name)
 
       start_val, end_val = exp[operator]["value"]
-      start_val = RelativeDatetime.normalize(start_val, tz, "beginning", col_type == :date)
-      end_val = RelativeDatetime.normalize(end_val, tz, "end", col_type == :date)
-      if col_type == :date
-        start_val = quote(start_val, col_type)
-        end_val   = quote(end_val, col_type)
-
-        clause = "val=#{col_ruby}; !val.nil? && val.to_date >= #{start_val} && val.to_date <= #{end_val}"
-      else
-        start_val = quote(start_val, col_type)
-        end_val   = quote(end_val, col_type)
-
-        clause = "val=#{col_ruby}; !val.nil? && val.to_time >= #{start_val} && val.to_time <= #{end_val}"
-      end
+      clause = ruby_for_date_compare(col_ruby, col_type, tz, ">=", start_val, "<=", end_val)
     else
       raise _("operator '%{operator_name}' is not supported") % {:operator_name => operator}
     end
@@ -1218,8 +1202,10 @@ class MiqExpression
       @reporting_available_fields[model.to_s] ||= {}
       @reporting_available_fields[model.to_s][interval.to_s] ||= MiqExpression.model_details(model, :include_model => false, :include_tags => true, :interval => interval)
     elsif Chargeback.db_is_chargeback?(model)
+      cb_model = Chargeback.report_cb_model(model)
       @reporting_available_fields[model.to_s] ||=
-        MiqExpression.model_details(model, :include_model => false, :include_tags => true).select { |c| c.last.ends_with?(*ReportController::Reports::Editor::CHARGEBACK_ALLOWED_FIELD_SUFFIXES) }
+        MiqExpression.model_details(model, :include_model => false, :include_tags => true).select { |c| c.last.ends_with?(*ReportController::Reports::Editor::CHARGEBACK_ALLOWED_FIELD_SUFFIXES) } +
+        MiqExpression.tag_details(cb_model, model, {})
     else
       @reporting_available_fields[model.to_s] ||= MiqExpression.model_details(model, :include_model => false, :include_tags => true)
     end
@@ -1340,6 +1326,7 @@ class MiqExpression
 
     model = determine_model(model, parts)
     return nil if model.nil?
+    return Field.parse(field).column_type if col.include?(CustomAttributeMixin::CUSTOM_ATTRIBUTES_PREFIX)
 
     col_type(model, col)
   end
@@ -1571,6 +1558,35 @@ class MiqExpression
     end
   end
 
+  def custom_attribute_columns_and_models(expression = nil)
+    return custom_attribute_columns_and_models(exp).uniq if expression.nil?
+
+    case expression
+    when Array
+      expression.flat_map { |x| custom_attribute_columns_and_models(x) }
+    when Hash
+      expression_values = expression.values
+      return [] unless expression.keys.first
+
+      if expression.keys.first == "field"
+        begin
+          field = Field.parse(expression_values.first)
+        rescue StandardError => err
+          _log.error("Cannot parse field #{field}" + err.message)
+          _log.log_backtrace(err)
+        end
+
+        return [] unless field
+
+        field.custom_attribute_column? ? [:model => field.model, :column => field.column] : []
+      else
+        expression.keys.first.casecmp('find').try(:zero?) ? [] : custom_attribute_columns_and_models(expression_values)
+      end
+    else
+      []
+    end
+  end
+
   def custom_attribute_columns(expression = nil)
     return custom_attribute_columns(exp).uniq if expression.nil?
 
@@ -1584,7 +1600,7 @@ class MiqExpression
         field = Field.parse(expression_values.first)
         field.custom_attribute_column? ? [field.column] : []
       else
-        expression.keys.first.casecmp('find').zero? ? [] : custom_attribute_columns(expression_values)
+        expression.keys.first.casecmp('find').try(:zero?) ? [] : custom_attribute_columns(expression_values)
       end
     else
       []
@@ -1592,6 +1608,24 @@ class MiqExpression
   end
 
   private
+
+  # example:
+  #   ruby_for_date_compare(:updated_at, :date, tz, "==", Time.now)
+  #   # => "val=update_at; !val.nil? && val.to_date == '2016-10-05'"
+  #
+  #   ruby_for_date_compare(:updated_at, :time, tz, ">", Time.yesterday, "<", Time.now)
+  #   # => "val=update_at; !val.nil? && val.utc > '2016-10-04T13:08:00-04:00' && val.utc < '2016-10-05T13:08:00-04:00'"
+
+  def self.ruby_for_date_compare(col_ruby, col_type, tz, op1, val1, op2 = nil, val2 = nil)
+    val_with_cast = "val.#{col_type == :date ? "to_date" : "to_time"}"
+    val1 = RelativeDatetime.normalize(val1, tz, "beginning", col_type == :date) if val1
+    val2 = RelativeDatetime.normalize(val2, tz, "end",       col_type == :date) if val2
+    [
+      "val=#{col_ruby}; !val.nil?",
+      op1 ? "#{val_with_cast} #{op1} #{quote(val1, col_type)}" : nil,
+      op2 ? "#{val_with_cast} #{op2} #{quote(val2, col_type)}" : nil,
+    ].compact.join(" && ")
+  end
 
   def to_arel(exp, tz)
     operator = exp.keys.first

@@ -22,7 +22,7 @@ Vmdb::Application.configure do
   config.whiny_nils = true
 
   # Show full error reports and disable caching
-  config.consider_all_requests_local       = true
+  config.consider_all_requests_local       = false
   config.action_controller.perform_caching = false
 
   # Raise exceptions instead of rendering exception templates
@@ -45,9 +45,6 @@ Vmdb::Application.configure do
   # should just be raised intact
   config.middleware.delete ::ActionDispatch::ShowExceptions
   config.middleware.delete ::ActionDispatch::DebugExceptions
-
-  # Raise exceptions in transactional callbacks
-  config.active_record.raise_in_transactional_callbacks = true
 
   # Customize any additional options below...
 

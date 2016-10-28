@@ -102,11 +102,11 @@ class ChargebackController < ApplicationController
     assert_privileges(params[:pressed]) if params[:pressed]
     case params[:button]
     when "cancel"
-      add_flash("#{params[:id] ?
+      add_flash((params[:id] ?
         _("Edit of %{model} \"%{name}\" was cancelled by the user") %
           {:model => ui_lookup(:model => "ChargebackRate"), :name => session[:edit][:new][:description]} :
         _("Add of new %{model} was cancelled by the user") %
-          {:model => ui_lookup(:model => "ChargebackRate")}}")
+          {:model => ui_lookup(:model => "ChargebackRate")}).to_s)
       get_node_info(x_node)
       @edit = session[:edit] = nil  # clean out the saved info
       session[:changed] =  false
@@ -326,7 +326,7 @@ class ChargebackController < ApplicationController
       rate_type = x_node.split('-').last
       begin
         ChargebackRate.set_assignments(rate_type, @edit[:set_assignments])
-      rescue StandardError => bang
+      rescue => bang
         render_flash(_("Error during 'Rate assignments': %{error_message}") % {:error_message => bang.message}, :error)
       else
         add_flash(_("Rate Assignments saved"))
@@ -801,7 +801,7 @@ class ChargebackController < ApplicationController
 
     # FIXME
     #  if params[:action].ends_with?("_delete")
-    #    page << "miqDynatreeActivateNodeSilently('#{x_active_tree.to_s}', '<%= x_node %>');"
+    #    page << "miqTreeActivateNodeSilently('#{x_active_tree.to_s}', '<%= x_node %>');"
     #  end
     # presenter[:select_node] = x_node if params[:action].ends_with?("_delete")
     presenter[:osf_node] = x_node

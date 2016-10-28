@@ -1,5 +1,5 @@
 describe VmOrTemplate do
-  include ArelSpecHelper
+  include Spec::Support::ArelHelper
 
   let(:vm)      { FactoryGirl.create(:vm_or_template) }
   let(:ems)     { FactoryGirl.create(:ext_management_system) }
@@ -392,7 +392,7 @@ describe VmOrTemplate do
     [:template_vmware, :vm_vmware].each do |vm_or_template|
       let(:instance) { FactoryGirl.create(vm_or_template) }
 
-      it "#{vm_or_template.to_s.classify}" do
+      it vm_or_template.to_s.classify do
         expect(EmsRefresh).to receive(:queue_refresh).with([[VmOrTemplate, instance.id]])
 
         instance.class.refresh_ems(instance.id)
@@ -466,9 +466,42 @@ describe VmOrTemplate do
     end
   end
 
+  context "#supports_terminate?" do
+    let(:ems_does_vm_destroy) { FactoryGirl.create(:ems_vmware) }
+    let(:ems_doesnot_vm_destroy) { FactoryGirl.create(:ems_vmware_cloud) }
+    let(:host) { FactoryGirl.create(:host) }
+
+    it "returns true for a VM not terminated" do
+      vm = FactoryGirl.create(:vm, :host => host, :ext_management_system => ems_does_vm_destroy)
+      allow(vm).to receive_messages(:terminated? => false)
+      expect(vm.supports_terminate?).to eq(true)
+    end
+
+    it "returns false for a terminated VM" do
+      vm = FactoryGirl.create(:vm, :host => host, :ext_management_system => ems_does_vm_destroy)
+      allow(vm).to receive_messages(:terminated? => true)
+      expect(vm.supports_terminate?).to eq(false)
+      expect(vm.unsupported_reason(:terminate)).to eq("The VM is terminated")
+    end
+
+    it "returns false for a provider doesn't support vm_destroy" do
+      vm = FactoryGirl.create(:vm, :host => host, :ext_management_system => ems_doesnot_vm_destroy)
+      allow(vm).to receive_messages(:terminated? => false)
+      expect(vm.supports_terminate?).to eq(false)
+      expect(vm.unsupported_reason(:terminate)).to eq("Provider doesn't support vm_destroy")
+    end
+
+    it "returns false for a WMware VM" do
+      vm = FactoryGirl.create(:vm, :host => host, :ext_management_system => ems_does_vm_destroy)
+      allow(vm).to receive_messages(:terminated? => false)
+      expect(vm.supports_terminate?).to eq(true)
+    end
+  end
+
   context "#self.batch_operation_supported?" do
     let(:ems)     { FactoryGirl.create(:ext_management_system) }
     let(:storage) { FactoryGirl.create(:storage) }
+    let(:host) { FactoryGirl.create(:host) }
 
     it "when the vm_or_template supports migrate,  returns false" do
       vm1 =  FactoryGirl.create(:vm_microsoft)
@@ -480,6 +513,14 @@ describe VmOrTemplate do
       vm1 =  FactoryGirl.create(:vm_vmware, :storage => storage, :ext_management_system => ems)
       vm2 =  FactoryGirl.create(:vm_vmware, :storage => storage, :ext_management_system => ems)
       expect(VmOrTemplate.batch_operation_supported?(:migrate, [vm1.id, vm2.id])).to eq(true)
+    end
+
+    it "when the vm_or_template supports terminate, returns true" do
+      ems_vmware = FactoryGirl.create(:ems_vmware)
+      ems_ms = FactoryGirl.create(:ems_microsoft)
+      vm1 =  FactoryGirl.create(:vm_microsoft, :host => host, :ext_management_system => ems_ms)
+      vm2 =  FactoryGirl.create(:vm_vmware, :host => host, :ext_management_system => ems_vmware)
+      expect(VmOrTemplate.batch_operation_supported?(:terminate, [vm1.id, vm2.id])).to eq(true)
     end
   end
 
@@ -741,6 +782,37 @@ describe VmOrTemplate do
       vm.disconnect_ems(FactoryGirl.build(:ext_management_system))
       expect(vm.ext_management_system).not_to be_nil
       expect(vm.ems_cluster).not_to be_nil
+    end
+  end
+
+  describe "#all_archived" do
+    let(:ems) { FactoryGirl.build(:ext_management_system) }
+    it "works" do
+      FactoryGirl.create(:vm_or_template, :ext_management_system => ems)
+      arch = FactoryGirl.create(:vm_or_template)
+      FactoryGirl.create(:vm_or_template, :storage => FactoryGirl.create(:storage))
+
+      expect(VmOrTemplate.all_archived).to eq([arch])
+    end
+  end
+
+  describe "#all_orphaned" do
+    it "works" do
+      FactoryGirl.create(:vm_or_template, :ext_management_system => ems)
+      FactoryGirl.create(:vm_or_template)
+      orph = FactoryGirl.create(:vm_or_template, :storage => FactoryGirl.create(:storage))
+
+      expect(VmOrTemplate.all_orphaned).to eq([orph])
+    end
+  end
+
+  describe "#all_archived_or_orphaned" do
+    it "works" do
+      vm = FactoryGirl.create(:vm_or_template, :ext_management_system => ems)
+      FactoryGirl.create(:vm_or_template)
+      FactoryGirl.create(:vm_or_template, :storage => FactoryGirl.create(:storage))
+
+      expect(VmOrTemplate.not_archived_nor_orphaned).to eq([vm])
     end
   end
 end

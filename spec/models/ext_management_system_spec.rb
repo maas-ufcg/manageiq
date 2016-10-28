@@ -19,8 +19,6 @@ describe ExtManagementSystem do
   let(:all_types_and_descriptions) do
     {
       "ansible_tower_configuration" => "Ansible Tower Configuration",
-      "atomic"                      => "Atomic",
-      "atomic_enterprise"           => "Atomic Enterprise",
       "azure"                       => "Azure",
       "azure_network"               => "Azure Network",
       "ec2"                         => "Amazon EC2",
@@ -32,16 +30,19 @@ describe ExtManagementSystem do
       "hawkular"                    => "Hawkular",
       "kubernetes"                  => "Kubernetes",
       "openshift"                   => "OpenShift Origin",
-      "openshift_enterprise"        => "OpenShift Enterprise",
+      "openshift_enterprise"        => "OpenShift Container Platform",
       "openstack"                   => "OpenStack",
       "openstack_infra"             => "OpenStack Platform Director",
       "openstack_network"           => "OpenStack Network",
+      "physical_infra_manager"      => "PhysicalInfraManager", # TODO: (julian) remove once we have a physical_infra_manager implementation
       "nuage_network"               => "Nuage Network Manager",
       "rhevm"                       => "Red Hat Enterprise Virtualization Manager",
       "scvmm"                       => "Microsoft System Center VMM",
       "vmwarews"                    => "VMware vCenter",
       "vmware_cloud"                => "VMware vCloud",
       "vmware_cloud_network"        => "VMware Cloud Network",
+      "cinder"                      => "Cinder ",
+      "swift"                       => "Swift ",
     }
   end
 
@@ -66,10 +67,6 @@ describe ExtManagementSystem do
 
     it "permissions.tmpl.yml should contain all EMS types" do
       types = YAML.load_file(Rails.root.join("config/permissions.tmpl.yml"))
-      # atomic is no longer in the list of permissions, because they should be faded out
-      # and new container managers should be openshift. Until they are fully removed from the
-      # codebase: https://github.com/ManageIQ/manageiq/issues/8612
-      types += %w(ems-type:atomic ems-type:atomic_enterprise)
       stub_vmdb_permission_store_with_types(types) do
         expect(described_class.supported_types_and_descriptions_hash).to eq(all_types_and_descriptions)
       end
@@ -196,17 +193,43 @@ describe ExtManagementSystem do
     end
   end
 
-  context "with multiple endpoints using default authtype" do
+  context "with multiple endpoints using explicit authtype" do
     let(:ems) do
       FactoryGirl.build(:ems_openshift,
                         :connection_configurations => [{:endpoint       => {:role     => "default",
                                                                             :hostname => "openshift.example.org"},
                                                         :authentication => {:role     => "bearer",
+                                                                            :auth_key => "SomeSecret"}},
+                                                       {:endpoint       => {:role     => "hawkular",
+                                                                            :hostname => "openshift.example.org"},
+                                                        :authentication => {:role     => "hawkular",
                                                                             :auth_key => "SomeSecret"}}])
     end
 
     it "will contain the bearer authentication as default" do
       expect(ems.connection_configuration_by_role("default").authentication.authtype).to eq("bearer")
+    end
+    it "will contain the hawkular authentication as hawkular" do
+      expect(ems.connection_configuration_by_role("hawkular").authentication.authtype).to eq("hawkular")
+    end
+  end
+
+  context "with multiple endpoints using implicit default authtype" do
+    let(:ems) do
+      FactoryGirl.build(:ems_openshift,
+                        :connection_configurations => [{:endpoint       => {:role     => "default",
+                                                                            :hostname => "openshift.example.org"},
+                                                        :authentication => {:auth_key => "SomeSecret"}},
+                                                       {:endpoint       => {:role     => "hawkular",
+                                                                            :hostname => "openshift.example.org"},
+                                                        :authentication => {:auth_key => "SomeSecret"}}])
+    end
+
+    it "will contain the default authentication (bearer) for default endpoint" do
+      expect(ems.connection_configuration_by_role("default").authentication.authtype).to eq("bearer")
+    end
+    it "will contain the hawkular authentication for the hawkular endpoint" do
+      expect(ems.connection_configuration_by_role("hawkular").authentication.authtype).to eq("hawkular")
     end
   end
 
@@ -271,7 +294,7 @@ describe ExtManagementSystem do
 
     %w(total_vms_on total_vms_off total_vms_unknown total_vms_never total_vms_suspended).each do |vcol|
       it "should have virtual column #{vcol} " do
-        expect(described_class).to have_virtual_column "#{vcol}", :integer
+        expect(described_class).to have_virtual_column vcol.to_s, :integer
       end
     end
 
@@ -315,7 +338,9 @@ describe ExtManagementSystem do
         next if [ManageIQ::Providers::Openstack::NetworkManager,
                  ManageIQ::Providers::Amazon::NetworkManager,
                  ManageIQ::Providers::Azure::NetworkManager,
-                 ManageIQ::Providers::Google::NetworkManager].include? ems
+                 ManageIQ::Providers::Google::NetworkManager,
+                 ManageIQ::Providers::StorageManager::CinderManager,
+                 ManageIQ::Providers::StorageManager::SwiftManager].include? ems
         t = ems.name.underscore
 
         context t do
@@ -339,6 +364,25 @@ describe ExtManagementSystem do
               expect { FactoryGirl.create(t, :hostname => nil) }.to raise_error(ActiveRecord::RecordInvalid)
             end
           end
+
+          if ems.new.supports_port?
+            it "numeric port" do
+              expect { FactoryGirl.create(t, :port => "555") }.to_not raise_error
+            end
+
+            it "non-numeric port" do
+              expect { FactoryGirl.create(t, :port => "g55") }.to raise_error(ActiveRecord::RecordInvalid)
+            end
+
+            it "greater than 0 port" do
+              expect { FactoryGirl.create(t, :port => "-1") }.to raise_error(ActiveRecord::RecordInvalid)
+              expect { FactoryGirl.create(t, :port => "0") }.to raise_error(ActiveRecord::RecordInvalid)
+            end
+
+            it "nil port" do
+              expect { FactoryGirl.create(t, :port => nil) }.to_not raise_error
+            end
+          end
         end
       end
     end
@@ -354,7 +398,9 @@ describe ExtManagementSystem do
         next if [ManageIQ::Providers::Openstack::NetworkManager,
                  ManageIQ::Providers::Amazon::NetworkManager,
                  ManageIQ::Providers::Azure::NetworkManager,
-                 ManageIQ::Providers::Google::NetworkManager].include? ems
+                 ManageIQ::Providers::Google::NetworkManager,
+                 ManageIQ::Providers::StorageManager::CinderManager,
+                 ManageIQ::Providers::StorageManager::SwiftManager].include? ems
 
         context t do
           it "duplicate name" do

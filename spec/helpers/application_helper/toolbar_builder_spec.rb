@@ -68,6 +68,7 @@ describe ApplicationHelper do
           :title     => CGI.escapeHTML(@button1.description.to_s),
           :text      => escaped_button1_text,
           :enabled   => true,
+          :klass     => ApplicationHelper::Button::ButtonWithoutRbacCheck,
           :url       => "button",
           :url_parms => "?id=#{subject.id}&button_id=#{@button1.id}&cls=#{subject.class.name}&pressed=custom_button&desc=#{escaped_button1_text}"
         }
@@ -95,6 +96,7 @@ describe ApplicationHelper do
           :title     => CGI.escapeHTML(@button1.description.to_s),
           :text      => escaped_button1_text,
           :enabled   => true,
+          :klass     => ApplicationHelper::Button::ButtonWithoutRbacCheck,
           :url       => "button",
           :url_parms => "?id=#{subject.id}&button_id=#{@button1.id}&cls=#{subject.class.name}&pressed=custom_button&desc=#{escaped_button1_text}"
         }
@@ -309,30 +311,6 @@ describe ApplicationHelper do
       end
     end
 
-    context "when with miq_request_approve" do
-      before { @id = "miq_request_approve" }
-      it "and miq_request_approval feature is not allowed" do
-        expect(subject).to be_truthy
-      end
-
-      it "and miq_request_approval feature is allowed" do
-        stub_user(:features => :all)
-        expect(subject).to be_falsey
-      end
-    end
-
-    context "when with miq_request_deny" do
-      before { @id = "miq_request_deny" }
-      it "and miq_request_approval feature is not allowed" do
-        expect(subject).to be_truthy
-      end
-
-      it "and miq_request_approval feature is allowed" do
-        stub_user(:features => :all)
-        expect(subject).to be_falsey
-      end
-    end
-
     it "when id likes dialog_*" do
       @id = "dialog_some_thing"
       expect(subject).to be_falsey
@@ -358,10 +336,8 @@ describe ApplicationHelper do
     end
 
     ["ems_cluster_protect", "ext_management_system_protect",
-     "host_analyze_check_compliance", "host_check_compliance", "host_protect",
-     "host_shutdown", "host_reboot", "host_standby",
+     "host_analyze_check_compliance", "host_check_compliance",
      "host_enter_maint_mode", "host_exit_maint_mode",
-     "host_start", "host_stop", "host_reset",
      "repo_protect",
      "resource_pool_protect",
      "vm_check_compliance",
@@ -775,285 +751,6 @@ describe ApplicationHelper do
           expect(subject).to be_falsey
         end
       end
-
-      context "and id = host_protect" do
-        before do
-          @id = 'host_protect'
-          allow(@record).to receive_messages(:smart? => false)
-        end
-
-        it "and record is not smart" do
-          expect(subject).to be_truthy
-        end
-
-        it "and record is smart" do
-          allow(@record).to receive_messages(:smart? => true)
-          expect(subject).to be_falsey
-        end
-      end
-
-      context "and id = host_refresh" do
-        before do
-          @id = 'host_refresh'
-          allow(@record).to receive_messages(:is_refreshable? => false)
-        end
-
-        it "and record is not refreshable" do
-          expect(subject).to be_truthy
-        end
-
-        it "and record is refreshable" do
-          allow(@record).to receive_messages(:is_refreshable? => true)
-          expect(subject).to be_falsey
-        end
-      end
-
-      context "and id = host_scan" do
-        before { @id = 'host_scan' }
-
-        it "and record is not scannable" do
-          allow(@record).to receive_messages(:is_scannable? => false)
-          expect(subject).to be_truthy
-        end
-
-        it "and record is scannable" do
-          allow(@record).to receive_messages(:is_scannable? => true)
-          expect(subject).to be_falsey
-        end
-      end
-
-      ["host_shutdown", "host_standby", "host_reboot", "host_enter_maint_mode", "host_exit_maint_mode", "host_start", "host_stop", "host_reset"].each do |id|
-        context "and id = #{id}" do
-          before do
-            @id = id
-            allow(@record).to receive_messages(:is_available? => false)
-          end
-
-          it "and record is not available" do
-            expect(subject).to be_truthy
-          end
-
-          it "and record is available" do
-            allow(@record).to receive_messages(:is_available? => true)
-            expect(subject).to be_falsey
-          end
-        end
-      end
-
-      ["perf_refresh", "perf_reload", "vm_perf_refresh", "vm_perf_reload"].each do |id|
-        context "and id = #{id}" do
-          before do
-            @id = id
-            @perf_options = {:typ => "realtime"}
-          end
-
-          it "and @perf_options[:typ] != 'realtime'" do
-            @perf_options = {:typ => "Daily"}
-            expect(subject).to be_truthy
-          end
-
-          it "and @perf_options[:typ] = 'realtime'" do
-            expect(subject).to be_falsey
-          end
-        end
-      end
-    end
-
-    ["MiqProvisionRequest", "MiqHostProvisionRequest", "VmReconfigureRequest", "VmMigrateRequest", "AutomationRequest", "ServiceTemplateProvisionRequest"].each do |cls|
-      context "when with #{cls}" do
-        before do
-          @record = cls.constantize.new
-          stub_user(:features => :all)
-        end
-
-        context "and id = miq_request_approve" do
-          before do
-            @id = "miq_request_approve"
-            allow(@record).to receive_messages(:resource_type => "something", :approval_state => "xx")
-          end
-
-          it "and resource_type = AutomationRequest" do
-            allow(@record).to receive_messages(:resource_type => "AutomationRequest")
-            expect(subject).to be_falsey
-          end
-
-          it "and approval_state = approved" do
-            allow(@record).to receive_messages(:approval_state => "approved")
-            expect(subject).to be_truthy
-          end
-
-          it "and showtype = miq_provisions" do
-            @showtype = "miq_provisions"
-            expect(subject).to be_truthy
-          end
-
-          it "and approval_state != approved and showtype != miq_provisions" do
-            expect(subject).to be_falsey
-          end
-        end
-
-        context "and id = miq_request_deny" do
-          before do
-            @id = "miq_request_deny"
-            allow(@record).to receive_messages(:resource_type => "something", :approval_state => "xx")
-          end
-
-          it "and resource_type = AutomationRequest" do
-            allow(@record).to receive_messages(:resource_type => "AutomationRequest")
-            expect(subject).to be_falsey
-          end
-
-          it "and approval_state = approved" do
-            allow(@record).to receive_messages(:approval_state => "approved")
-            expect(subject).to be_truthy
-          end
-
-          it "and approval_state = denied" do
-            allow(@record).to receive_messages(:approval_state => "denied")
-            expect(subject).to be_truthy
-          end
-
-          it "and showtype = miq_provisions" do
-            @showtype = "miq_provisions"
-            expect(subject).to be_truthy
-          end
-
-          it "and approval_state != approved|denied and showtype != miq_provisions" do
-            expect(subject).to be_falsey
-          end
-        end
-
-        context "and id = miq_request_delete" do
-          before do
-            @id = "miq_request_delete"
-            allow(@record).to receive_messages(:resource_type => "something", :approval_state => "xx", :requester_name => user.name)
-            allow(User).to receive(:find_by_userid).and_return(user)
-          end
-
-          it "and resource_type = AutomationRequest" do
-            allow(@record).to receive_messages(:resource_type => "AutomationRequest")
-            expect(subject).to be_falsey
-          end
-
-          it "and requester.name != @record.requester_name" do
-            allow(@record).to receive_messages(:requester_name => 'admin')
-            expect(subject).to be_falsey
-          end
-
-          it "and approval_state = approved" do
-            allow(@record).to receive_messages(:approval_state => "approved")
-            expect(subject).to be_falsey
-          end
-
-          it "and approval_state = denied" do
-            allow(@record).to receive_messages(:approval_state => "denied")
-            expect(subject).to be_falsey
-          end
-
-          it "and requester.name = @record.requester_name & approval_state != approved|denied" do
-            expect(subject).to be_falsey
-          end
-        end
-
-        context "and id = miq_request_edit" do
-          before do
-            @id = "miq_request_edit"
-            allow(@record).to receive_messages(:resource_type => "something", :approval_state => "xx", :requester_name => user.name)
-            allow(User).to receive(:find_by_userid).and_return(user)
-          end
-
-          it "and resource_type = AutomationRequest" do
-            allow(@record).to receive_messages(:resource_type => "AutomationRequest")
-            expect(subject).to be_truthy
-          end
-
-          it "and requester.name != @record.requester_name" do
-            allow(@record).to receive_messages(:requester_name => 'admin')
-            expect(subject).to be_truthy
-          end
-
-          it "and approval_state = approved" do
-            allow(@record).to receive_messages(:approval_state => "approved")
-            expect(subject).to be_truthy
-          end
-
-          it "and approval_state = denied" do
-            allow(@record).to receive_messages(:approval_state => "denied")
-            expect(subject).to be_truthy
-          end
-
-          it "and requester.name = @record.requester_name & approval_state != approved|denied" do
-            expect(subject).to be_falsey
-          end
-        end
-
-        context "and id = miq_request_copy" do
-          before do
-            @id = "miq_request_copy"
-            allow(@record).to receive_messages(:resource_type  => "MiqProvisionRequest",
-                         :approval_state => "pending_approval",
-                         :requester_name => user.name)
-            allow(User).to receive(:find_by_userid).and_return(user)
-          end
-
-          it "and resource_type = AutomationRequest" do
-            allow(@record).to receive_messages(:resource_type => "AutomationRequest")
-            expect(subject).to be_truthy
-          end
-
-          it "and resource_type != MiqProvisionRequest" do
-            allow(@record).to receive_messages(:resource_type => "SomeRequest")
-            expect(subject).to be_truthy
-          end
-
-          it "and requester.name != @record.requester_name & showtype = miq_provisions" do
-            @showtype = "miq_provisions"
-            allow(@record).to receive_messages(:requester_name => 'admin')
-            expect(subject).to be_truthy
-          end
-
-          it "and approval_state = approved & showtype = miq_provisions" do
-            @showtype = "miq_provisions"
-            allow(@record).to receive_messages(:approval_state => "approved")
-            expect(subject).to be_truthy
-          end
-
-          it "and approval_state = denied & showtype = miq_provisions" do
-            @showtype = "miq_provisions"
-            allow(@record).to receive_messages(:approval_state => "denied")
-            expect(subject).to be_truthy
-          end
-
-          it "and resource_type = MiqProvisionRequest & requester.name = @record.requester_name & approval_state != approved|denied" do
-            @showtype = "miq_provisions"
-            expect(subject).to be_falsey
-          end
-
-          it "and resource_type = MiqProvisionRequest & showtype != miq_provisions" do
-            allow(@record).to receive_messages(:requester_name => 'admin')
-            expect(subject).to be_falsey
-          end
-        end
-      end
-    end
-
-    context "when with MiqAlert" do
-      before do
-        @record = MiqAlert.new
-        @layout = "miq_policy"
-      end
-
-      it "alert_copy don't hide if RBAC allows" do
-        stub_user(:features => :all)
-        @id = "alert_copy"
-        expect(subject).to be_falsey
-      end
-
-      it "alert_copy hide if RBAC denies" do
-        stub_user(:features => :none)
-        @id = "alert_copy"
-        expect(subject).to be_truthy
-      end
     end
 
     context "when with MiqServer" do
@@ -1073,31 +770,6 @@ describe ApplicationHelper do
       it "otherwise" do
         @id = 'xx'
         expect(subject).to be_falsey
-      end
-    end
-
-    context "when with ScanItemSet" do
-      before do
-        @record = ScanItemSet.new
-        stub_user(:features => :all)
-      end
-
-      ["scan_delete", "scan_edit"].each do |id|
-        context "and id = #{id}" do
-          before do
-            @id = id
-            allow(@record).to receive_messages(:read_only => false)
-          end
-
-          it "and record read only" do
-            allow(@record).to receive_messages(:read_only => true)
-            expect(subject).to be_truthy
-          end
-
-          it "and record not read only" do
-            expect(subject).to be_falsey
-          end
-        end
       end
     end
 
@@ -1133,116 +805,6 @@ describe ApplicationHelper do
         end
       end
     end
-
-    context "when with MiqTemplate" do
-      before do
-        @record = MiqTemplate.new
-        stub_user(:features => :all)
-      end
-
-      context "and id = miq_template_clone" do
-        before do
-          @id = "miq_template_clone"
-        end
-
-        it "record is not cloneable" do
-          @record =  MiqTemplate.create(:type     => "ManageIQ::Providers::Redhat::InfraManager::Template",
-                                        :name     => "rh",
-                                        :location => "loc1",
-                                        :vendor   => "redhat")
-          expect(subject).to be_falsey
-        end
-
-        it "record is cloneable" do
-          @record =  MiqTemplate.create(:type     => "ManageIQ::Providers::Vmware::InfraManager::Template",
-                                        :name     => "vm",
-                                        :location => "loc2",
-                                        :vendor   => "vmware")
-          expect(subject).to be_falsey
-        end
-      end
-
-      ["miq_template_policy_sim", "miq_template_protect"].each do |id|
-        context "and id = #{id}" do
-          before do
-            @id = id
-            allow(@record).to receive_messages(:host => double(:vmm_product => "Server"))
-          end
-
-          it "and @record.host.vmm_product = workstation" do
-            allow(@record).to receive_messages(:host => double(:vmm_product => "Workstation"))
-            expect(subject).to be_truthy
-          end
-
-          it "and !@record.host" do
-            allow(@record).to receive_messages(:host => nil)
-            expect(subject).to be_falsey
-          end
-
-          it "and @record.host.vmm_product != workstation" do
-            expect(subject).to be_falsey
-          end
-        end
-      end
-
-      context "and id = miq_template_refresh" do
-        before do
-          @id = "miq_template_refresh"
-          allow(@record).to receive_messages(:host => double(:vmm_product => "Workstation"), :ext_management_system => true)
-        end
-
-        it "and !@record.ext_management_system & @record.host.vmm_product != workstation" do
-          allow(@record).to receive_messages(:host => double(:vmm_product => "Server"), :ext_management_system => false)
-          expect(subject).to be_truthy
-        end
-
-        it "and @record.ext_management_system" do
-          expect(subject).to be_falsey
-        end
-
-        it "and @record.host.vmm_product = workstation" do
-          expect(subject).to be_falsey
-        end
-      end
-
-      context "and id = miq_template_scan" do
-        before { @id = "miq_template_scan" }
-
-        it "returns true for hiding the button when @record neither has proxy nor supports smartstate analysis" do
-          allow(@record).to receive_messages(:supports_smartstate_analysis? => false, :has_proxy? => false)
-          expect(subject).to be_truthy
-        end
-
-        it "returns true for hiding the button when @record does not have proxy but it supports smartstate analysis" do
-          allow(@record).to receive_messages(:supports_smartstate_analysis? => true, :has_proxy? => false)
-          expect(subject).to be_truthy
-        end
-
-        it "returns true for hiding the button when @record has proxy but it does not support smartstate analysis" do
-          allow(@record).to receive_messages(:supports_smartstate_analysis? => false, :has_proxy? => true)
-          expect(subject).to be_truthy
-        end
-
-        it "returns false for hiding the button when @record has proxy and it supports smartstate analysis" do
-          allow(@record).to receive_messages(:supports_smartstate_analysis? => true, :has_proxy? => true)
-          expect(subject).to be_falsey
-        end
-      end
-
-      context "and id = miq_template_reload" do
-        before { @id = "miq_template_reload" }
-
-        it "and @perf_options[:typ] != realtime" do
-          @perf_options = {:typ => "Daily"}
-          expect(subject).to be_truthy
-        end
-
-        it "and @perf_options[:typ] = realtime" do
-          @perf_options = {:typ => "realtime"}
-          expect(subject).to be_falsey
-        end
-      end
-    end # MiqTemplate
 
     context "when with record = nil" do
       before do
@@ -1721,35 +1283,6 @@ describe ApplicationHelper do
         it_behaves_like 'default case'
       end
 
-      context "and id = host_refresh" do
-        before do
-          @id = "host_refresh"
-          allow(@record).to receive_messages(:is_refreshable_now? => true)
-        end
-        it "when not configured for refresh" do
-          message = "Host not configured for refresh"
-          allow(@record).to receive_messages(:is_refreshable_now_error_message => message, :is_refreshable_now? => false)
-          expect(subject).to eq(message)
-        end
-
-        it_behaves_like 'default case'
-      end
-
-      context "and id = host_scan" do
-        before do
-          @id = "host_scan"
-          allow(@record).to receive_messages(:is_scannable_now? => true)
-        end
-
-        it "when not scannable now" do
-          message = "Provide credentials for IPMI"
-          allow(@record).to receive_messages(:is_scannable_now? => false, :is_scannable_now_error_message => message)
-          expect(subject).to eq(message)
-        end
-
-        it_behaves_like 'default case'
-      end
-
       context "and id = host_timeline" do
         before do
           @id = "host_timeline"
@@ -1757,25 +1290,6 @@ describe ApplicationHelper do
         end
 
         it_behaves_like 'record without ems events and policy events', "No Timeline data has been collected for this Host"
-        it_behaves_like 'default case'
-      end
-
-      context "and id = host_shutdown" do
-        before do
-          @id = "host_shutdown"
-          allow(@record).to receive_messages(:is_available_now_error_message => false)
-        end
-        it_behaves_like 'record with error message', 'shutdown'
-        it_behaves_like 'default case'
-      end
-
-      context "and id = host_restart" do
-        before do
-          @id = "host_restart"
-          allow(@record).to receive_messages(:is_available_now_error_message => false)
-        end
-
-        it_behaves_like 'record with error message', 'reboot'
         it_behaves_like 'default case'
       end
     end
@@ -2133,8 +1647,8 @@ describe ApplicationHelper do
         end
       end
 
-      # This is practically a copy paste from the VMWare tests, wasted lots of time trying ot make shared example but 
-      # unfortunately it kept failing on travis while passing localy, also causing other tests to fail from totaly 
+      # This is practically a copy paste from the VMWare tests, wasted lots of time trying ot make shared example but
+      # unfortunately it kept failing on travis while passing localy, also causing other tests to fail from totaly
       # diffrent parts of the project. This is not nice but I can't spend more time on trying to figure it out.
       context "RHEV snapshot buttons" do
         before do
@@ -2233,7 +1747,7 @@ describe ApplicationHelper do
       let(:server) { double("MiqServer", :logon_status => :ready) }
       let(:user)   { FactoryGirl.create(:user_admin) }
       before do
-        allow(MiqServer).to receive(:my_server).with(true).and_return(server)
+        allow(MiqServer).to receive(:my_server).and_return(server)
 
         @id = "miq_request_delete"
         login_as user
@@ -2792,6 +2306,48 @@ describe ApplicationHelper do
       remove_btn = buttons.find { |b| b[:id].end_with?("_remove") }
       expect(edit_btn[:enabled]).to eq(false)
       expect(remove_btn[:enabled]).to eq(false)
+    end
+  end
+
+  describe "#build_by_class" do
+    context "when the toolbar to be built is a blank view" do
+      let(:toolbar_to_build) { ApplicationHelper::Toolbar::BlankView }
+
+      it "returns nil" do
+        expect(_toolbar_builder.build_by_class(toolbar_to_build)).to be_nil
+      end
+    end
+
+    context "when the toolbar to be built is a generic object toolbar" do
+      let(:toolbar_to_build) { ApplicationHelper::Toolbar::GenericObjectDefinition }
+
+      before do
+        allow(Rbac).to receive(:role_allows?).and_return(true)
+      end
+
+      it "includes the button group" do
+        expect(_toolbar_builder.build_by_class(toolbar_to_build).first).to include(
+          :id    => "generic_object_definition_choice",
+          :type  => :buttonSelect,
+          :icon  => "fa fa-cog fa-lg",
+          :title => "Configuration",
+          :text  => "Configuration"
+        )
+      end
+
+      it "includes the correct button items" do
+        expect(_toolbar_builder.build_by_class(toolbar_to_build).first[:items].first).to include(
+          :id    => "generic_object_definition_choice__generic_object_definition_create",
+          :type  => :button,
+          :icon  => "pficon pficon-add-circle-o fa-lg",
+          :title => "Create a new Generic Object Definition",
+          :text  => "Create a new Generic Object Definition",
+          :data  => {
+            'function'      => 'sendDataWithRx',
+            'function-data' => '{"eventType": "showAddForm"}'
+          }
+        )
+      end
     end
   end
 end

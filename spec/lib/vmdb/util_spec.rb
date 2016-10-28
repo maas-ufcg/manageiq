@@ -5,39 +5,44 @@ describe VMDB::Util do
       expect(described_class.http_proxy_uri).to be_nil
     end
 
-    it "without a host" do
-      stub_server_configuration(:http_proxy => {})
-      expect(described_class.http_proxy_uri).to be_nil
-    end
-
-    it "with host" do
+    it "returns proxy for old settings" do
       stub_server_configuration(:http_proxy => {:host => "1.2.3.4", :port => nil, :user => nil, :password => nil})
       expect(described_class.http_proxy_uri).to eq(URI::Generic.build(:scheme => "http", :host => "1.2.3.4"))
     end
 
+    it "without a host" do
+      stub_server_configuration(:http_proxy => {:default => {}})
+      expect(described_class.http_proxy_uri).to be_nil
+    end
+
+    it "with host" do
+      stub_server_configuration(:http_proxy => {:default => {:host => "1.2.3.4", :port => nil, :user => nil, :password => nil}})
+      expect(described_class.http_proxy_uri).to eq(URI::Generic.build(:scheme => "http", :host => "1.2.3.4"))
+    end
+
     it "with host, port" do
-      stub_server_configuration(:http_proxy => {:host => "1.2.3.4", :port => 4321, :user => nil, :password => nil})
+      stub_server_configuration(:http_proxy => {:default => {:host => "1.2.3.4", :port => 4321, :user => nil, :password => nil}})
       expect(described_class.http_proxy_uri).to eq(URI::Generic.build(:scheme => "http", :host => "1.2.3.4", :port => 4321))
     end
 
     it "with host, port, user" do
-      stub_server_configuration(:http_proxy => {:host => "1.2.3.4", :port => 4321, :user => "testuser", :password => nil})
+      stub_server_configuration(:http_proxy => {:default => {:host => "1.2.3.4", :port => 4321, :user => "testuser", :password => nil}})
       expect(described_class.http_proxy_uri).to eq(URI::Generic.build(:scheme => "http", :host => "1.2.3.4", :port => 4321, :userinfo => "testuser"))
     end
 
     it "with host, port, user, password" do
-      stub_server_configuration(:http_proxy => {:host => "1.2.3.4", :port => 4321, :user => "testuser", :password => "secret"})
+      stub_server_configuration(:http_proxy => {:default => {:host => "1.2.3.4", :port => 4321, :user => "testuser", :password => "secret"}})
       expect(described_class.http_proxy_uri).to eq(URI::Generic.build(:scheme => "http", :host => "1.2.3.4", :port => 4321, :userinfo => "testuser:secret"))
     end
 
     it "with user missing" do
-      stub_server_configuration(:http_proxy => {:host => "1.2.3.4", :port => 4321, :user => nil, :password => "secret"})
+      stub_server_configuration(:http_proxy => {:default => {:host => "1.2.3.4", :port => 4321, :user => nil, :password => "secret"}})
       expect(described_class.http_proxy_uri).to eq(URI::Generic.build(:scheme => "http", :host => "1.2.3.4", :port => 4321))
     end
 
     it "with unescaped user value" do
       password = "secret#"
-      config = {:http_proxy => {:host => "1.2.3.4", :port => 4321, :user => "testuser", :password => password}}
+      config = {:http_proxy => {:default => {:host => "1.2.3.4", :port => 4321, :user => "testuser", :password => password}}}
       stub_server_configuration(config)
       userinfo = "testuser:secret%23"
       uri_parts = {:scheme => "http", :host => "1.2.3.4", :port => 4321, :userinfo => userinfo}
@@ -45,7 +50,7 @@ describe VMDB::Util do
     end
 
     it "with scheme overridden" do
-      stub_server_configuration(:http_proxy => {:scheme => "https", :host => "1.2.3.4", :port => 4321, :user => "testuser", :password => "secret"})
+      stub_server_configuration(:http_proxy => {:default => {:scheme => "https", :host => "1.2.3.4", :port => 4321, :user => "testuser", :password => "secret"}})
       expect(described_class.http_proxy_uri).to eq(URI::Generic.build(:scheme => "https", :host => "1.2.3.4", :port => 4321, :userinfo => "testuser:secret"))
     end
   end
@@ -89,7 +94,7 @@ describe VMDB::Util do
 
     def self.assert_zip_entry_from_path(expected_entry, path)
       it "#{path} => #{expected_entry}" do
-        expect(described_class.zip_entry_from_path(path)).to eq(expected_entry)
+        expect(described_class.send(:zip_entry_from_path, path)).to eq(expected_entry)
       end
     end
 
@@ -101,7 +106,7 @@ describe VMDB::Util do
     assert_zip_entry_from_path("GUID", "/var/www/miq/vmdb/GUID")
   end
 
-  it ".add_zip_entry" do
+  it ".add_zip_entry(private)" do
     require 'zip/zipfilesystem'
     file  = "/var/log/messages.log"
     entry = "ROOT/var/log/messages.log"
@@ -115,7 +120,7 @@ describe VMDB::Util do
     expect(zip).to receive(:add).with(zip_entry, file)
     zip_file = double
 
-    expect(described_class.add_zip_entry(zip, file, zip_file)).to eq([entry, mtime])
+    expect(described_class.send(:add_zip_entry, zip, file, zip_file)).to eq([entry, mtime])
   end
 
   it ".get_evm_log_for_date" do

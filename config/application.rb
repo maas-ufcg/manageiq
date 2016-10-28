@@ -7,6 +7,7 @@ require 'action_view/railtie'
 require 'action_mailer/railtie'
 require 'active_job/railtie'
 require 'sprockets/railtie'
+require 'action_cable/engine'
 
 if defined?(Bundler)
   Bundler.require(*Rails.groups(:assets => %w(development test)), :ui_dependencies)
@@ -63,15 +64,13 @@ module Vmdb
     # Set the manifest file name so that we are sure it gets overwritten on updates
     config.assets.manifest = Rails.root.join("public/assets/.sprockets-manifest.json").to_s
 
+    # Disable ActionCable's request forgery protection
+    # This is basically matching a set of allowed origins which is not good for us
+    # Our own origin-host forgery protection is implemented in lib/websocket_server.rb
+    Rails.application.config.action_cable.disable_request_forgery_protection = true
+
     # Customize any additional options below...
 
-    # HACK: By default, Rails.configuration.eager_load_paths contains all of the directories
-    # in app and Rails.configuration.autoload_paths is empty.  Sometime during initialization,
-    # these two arrays are combined and placed into ActiveSupport::Dependencies.autoload_paths,
-    # which is what is used for autoloading.  Since we do not want to eager load anything due
-    # to memory bloat, we clear out eager_load_paths down below.  This ends up leaving the
-    # ActiveSupport::Dependencies.autoload_paths empty, thus breaking autoloading.  Thus, in
-    # order to prevent eager loading, but still populate autoload_paths, we copy them.
     config.autoload_paths += config.eager_load_paths
     config.autoload_paths << Rails.root.join("app", "models", "aliases")
     config.autoload_paths << Rails.root.join("app", "models", "mixins")
@@ -79,6 +78,8 @@ module Vmdb
     config.autoload_paths << Rails.root.join("lib", "miq_automation_engine", "models", "mixins")
     config.autoload_paths << Rails.root.join("app", "controllers", "mixins")
     config.autoload_paths << Rails.root.join("lib")
+
+    config.autoload_once_paths << Rails.root.join("lib", "vmdb", "console_methods.rb")
 
     # config.eager_load_paths accepts an array of paths from which Rails will eager load on boot if cache classes is enabled.
     # Defaults to every folder in the app directory of the application.

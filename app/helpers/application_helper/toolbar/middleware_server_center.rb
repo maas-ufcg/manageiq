@@ -110,4 +110,42 @@ class ApplicationHelper::Toolbar::MiddlewareServerCenter < ApplicationHelper::To
       ]
     ),
   ])
+  button_group('middleware_server_jdbc_drivers', [
+    select(
+      :middleware_server_jdbc_drivers_choice,
+      'fa fa-plug fa-lg',
+      t = N_('JDBC Drivers'),
+      t,
+      :items => [
+        button(
+          :middleware_jdbc_driver_add,
+          'fa fa-plug fa-lg',
+          N_('Add a new Middleware JDBC Driver'),
+          N_('Add JDBC Driver'),
+          :data => {'toggle'        => 'modal',
+                    'target'        => '#modal_jdbc_div',
+                    'function'      => 'miqCallAngular',
+                    'function-data' => '{"name": "showJdbcDriverListener", "args": []}'})
+      ]
+    ),
+  ])
+  button_group('middleware_server_datasources', [
+    select(
+      :middleware_server_datasources_choice,
+      'fa fa-database fa-lg',
+      t = N_('Datasources'),
+      t,
+      :items => [
+        button(
+          :middleware_datasource_add,
+          'fa fa-database fa-lg',
+          N_('Add a new Middleware Datasource'),
+          N_('Add Datasource'),
+          :data => {'toggle'        => 'modal',
+                    'target'        => '#modal_ds_div',
+                    'function'      => 'miqCallAngular',
+                    'function-data' => '{"name": "showDatasourceListener", "args": []}'})
+      ]
+    ),
+  ])
 end

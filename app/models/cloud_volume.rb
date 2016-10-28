@@ -5,11 +5,13 @@ class CloudVolume < ApplicationRecord
   include ProviderObjectMixin
   include AsyncDeleteMixin
   include AvailabilityMixin
+  include SupportsFeatureMixin
 
-  belongs_to :ext_management_system, :foreign_key => :ems_id, :class_name => "ManageIQ::Providers::CloudManager"
+  belongs_to :ext_management_system, :foreign_key => :ems_id, :class_name => "ExtManagementSystem"
   belongs_to :availability_zone
   belongs_to :cloud_tenant
   belongs_to :base_snapshot, :class_name => 'CloudVolumeSnapshot', :foreign_key => :cloud_volume_snapshot_id
+  has_many   :cloud_volume_backups
   has_many   :cloud_volume_snapshots
   has_many   :attachments, :class_name => 'Disk', :as => :backing
   has_many   :hardwares, :through => :attachments
@@ -79,4 +81,5 @@ class CloudVolume < ApplicationRecord
   def raw_delete_volume
     raise NotImplementedError, _("raw_delete_volume must be implemented in a subclass")
   end
+
 end

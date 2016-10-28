@@ -52,6 +52,14 @@ describe MiqAction do
       expect(MiqQueue).to receive(:put).with(q_options).once
       @action.action_custom_automation(@action, @vm, :synchronous => false)
     end
+
+    it "passes source event to automate if set" do
+      ems_event = FactoryGirl.create(:ems_event, :event_type => "CloneVM_Task")
+      args = {:attrs => {:request => "test_custom_automation", "EventStream::event_stream" => ems_event.id}}
+      expect(MiqAeEngine).to receive(:deliver).with(hash_including(args)).once
+
+      @action.action_custom_automation(@action, @vm, :synchronous => true, :source_event => ems_event)
+    end
   end
 
   context "#action_evm_event" do
@@ -189,7 +197,7 @@ describe MiqAction do
     let(:container_image) { FactoryGirl.create(:container_image) }
     let(:container_image_registry) { FactoryGirl.create(:container_image_registry) }
     let(:event) { FactoryGirl.create(:miq_event_definition, :name => "whatever") }
-    let(:event_loop) { FactoryGirl.create(:miq_event_definition, :name => "request_container_image_scan") }
+    let(:event_loop) { FactoryGirl.create(:miq_event_definition, :name => "request_containerimage_scan") }
     let(:action) { FactoryGirl.create(:miq_action, :name => "container_image_analyze") }
 
     it "scans container images" do
