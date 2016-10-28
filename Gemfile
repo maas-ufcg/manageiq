@@ -112,8 +112,8 @@ gem "ruport",                         "=1.7.0",                       :git => "h
 
 #To Lenovo provider
 gem "xclarity_client", :git => "git://github.com/maas-ufcg/xclarity_client", :branch => "master"
-gem "manageiq-providers-lenovo", :git => "git://github.com/maas-ufcg/manageiq-providers-lenovo", :branch => "refresher-fixes"
-
+#gem "manageiq-providers-lenovo", :git => "git://github.com/maas-ufcg/manageiq-providers-lenovo", :branch => "refresher-fixes"
+gem "manageiq-providers-lenovo", :path => "/home/walter/workspace/manageiq-providers-lenovo"
 
 
 # In 1.9.3: Time.parse uses british version dd/mm/yyyy instead of american version mm/dd/yyyy
