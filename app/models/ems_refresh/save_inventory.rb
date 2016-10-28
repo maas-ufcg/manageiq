@@ -6,6 +6,7 @@ module EmsRefresh::SaveInventory
       return
     end
     case ems
+    when ManageIQ::Providers::Lenovo::PhysicalInfraManager  then save_ems_physical_infra_inventory(ems, hashes, target)
     when EmsCloud                                           then save_ems_cloud_inventory(ems, hashes, target)
     when EmsInfra                                           then save_ems_infra_inventory(ems, hashes, target)
     when ManageIQ::Providers::ConfigurationManager          then save_configuration_manager_inventory(ems, hashes, target)
