@@ -27,6 +27,7 @@ module EmsRefresh::SaveInventoryPhysicalInfra
 
     # Save and link other subsections
     save_child_inventory(ems, hashes, child_keys, target)
+    # save_physical_servers_inventory(ems, hashes[:physical_servers], target)
 
     ems.save!
     hashes[:id] = ems.id

@@ -111,7 +111,8 @@ gem "ruport",                         "=1.7.0",                       :git => "h
 
 
 #To Lenovo provider
-gem "xclarity_client", :git => "git://github.com/maas-ufcg/xclarity_client", :branch => "master"
+gem "uuid"
+gem "xclarity_client", :git => "git://github.com/maas-ufcg/xclarity_client", :branch => "xclarity_resources"
 gem "manageiq-providers-lenovo", :git => "git://github.com/maas-ufcg/manageiq-providers-lenovo", :branch => "physical_server_refactoring"
 
 
