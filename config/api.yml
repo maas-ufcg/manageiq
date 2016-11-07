@@ -36,6 +36,12 @@
     - :patch
     - :delete
 :collections:
+  :physical_servers:
+    :description: Physical Servers
+    :options:
+    - :collection
+    :verbs: *g
+    :kclass: PhysicalServer
   :accounts:
     :description: Accounts
     :options:
