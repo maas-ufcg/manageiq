@@ -41,7 +41,7 @@
     :options:
     - :collection
     :verbs: *g
-    :kclass: PhysicalServer
+    :klass: PhysicalServer
   :accounts:
     :description: Accounts
     :options:
