@@ -5,19 +5,11 @@ module EmsInfraHelper::TextualSummary
   #
 
   def textual_group_properties
-    if @ems.emstype_description == "Lenovo XClarity"
-      %i(hostname ipaddress type port guid)
-    else
-      %i(hostname ipaddress type port cpu_resources memory_resources cpus cpu_cores guid host_default_vnc_port_range)
-    end
+    %i(hostname ipaddress type port cpu_resources memory_resources cpus cpu_cores guid host_default_vnc_port_range)
   end
 
   def textual_group_relationships
-    if @ems.emstype_description == "Lenovo XClarity"
-      %i(hosts)
-    else
-      %i(infrastructure_folders folders clusters hosts datastores vms templates orchestration_stacks ems_cloud)
-    end
+    %i(infrastructure_folders folders clusters hosts datastores vms templates orchestration_stacks ems_cloud)
   end
 
   def textual_group_status
