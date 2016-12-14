@@ -1,4 +1,5 @@
 raise "Ruby versions less than 2.2.2 are unsupported!" if RUBY_VERSION < "2.2.2"
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
 
 source 'https://rubygems.org'
 
@@ -17,10 +18,13 @@ eval_gemfile(dev_gemfile) if File.exist?(dev_gemfile)
 # Load other additional Gemfiles
 Dir.glob("bundler.d/*.rb").each { |f| eval_gemfile(File.expand_path(f, __dir__)) }
 
+=======
+>>>>>>> Add Gemfile
 #
 # VMDB specific gems
 #
 
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
 gem "manageiq-gems-pending", ">0", :require => 'manageiq-gems-pending', :git => "https://github.com/ManageIQ/manageiq-gems-pending.git", :branch => "master"
 # Modified gems for gems-pending.  Setting sources here since they are git references
 gem "handsoap", "~>0.2.5", :require => false, :git => "https://github.com/ManageIQ/handsoap.git", :tag => "v0.2.5-5"
@@ -40,12 +44,18 @@ end
 unless dependencies.detect { |d| d.name == "manageiq-ui-classic" }
   #gem "manageiq-ui-classic", :path => "../manageiq-ui-classic/"
   gem "manageiq-ui-classic", :git => "https://github.com/ManageIQ/manageiq-ui-classic", :branch => "master"
+=======
+# when using this Gemfile inside a providers Gemfile, the dependency for the provider is already declared
+unless dependencies.detect { |d| d.name == "manageiq-providers-amazon" }
+  gem "manageiq-providers-amazon", :git => "git://github.com/ManageIQ/manageiq-providers-amazon", :branch => "master"
+>>>>>>> Add Gemfile
 end
 
 # Unmodified gems
 gem "activerecord-session_store",     "~>1.0.0"
 gem "acts_as_list",                   "~>0.7.2"
 gem "acts_as_tree",                   "~>2.1.0" # acts_as_tree needs to be required so that it loads before ancestry
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
 gem "ancestry",                       "~>2.2.1",       :require => false
 gem "ansible_tower_client",           "~>0.4.1",       :require => false
 gem "aws-sdk",                        "~>2",           :require => false
@@ -64,13 +74,35 @@ gem "gettext_i18n_rails_js",          "~>1.1.0"
 gem "google-api-client",              "~>0.8.6",       :require => false
 gem "hamlit",                         "~>2.7.0"
 gem "hashie",                         ">=3.4.6",       :require => false
+=======
+gem "ancestry",                       "~>2.1.0",       :require => false
+gem "ansible_tower_client",           "~>0.3.2",       :require => false
+gem "aws-sdk",                        '~> 2.6.27',     :require => false
+gem "color",                          "~>1.8"
+gem "dalli",                          "~>2.7.4",       :require => false
+gem "draper",                         "~>3.0.0.pre1"
+gem "default_value_for",              "~>3.0.2"
+gem "elif",                           "=0.1.0",        :require => false
+gem "fast_gettext",                   "~>1.2.0"
+gem "fog-google",                     "~>0.3.0",       :require => false
+gem "fog-vcloud-director",            "~>0.1.5",       :require => false
+gem "gettext_i18n_rails",             "~>1.7.2"
+gem "gettext_i18n_rails_js",          "~>1.1.0"
+gem "google-api-client",              "~>0.8.6",       :require => false
+gem "hamlit",                         "~>2.0.0",       :require => false
+gem "hamlit-rails",                   "~>0.1.0"
+>>>>>>> Add Gemfile
 gem "high_voltage",                   "~>2.4.0"
 gem "htauth",                         "2.0.0",         :require => false
 gem "inifile",                        "~>3.0",         :require => false
 gem "jbuilder",                       "~>2.5.0" # For the REST API
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
 gem "manageiq-api-client",            "~>0.1.0",       :require => false
 gem "mime-types",                     "~>2.6.1",       :require => "mime/types/columnar"
 gem "more_core_extensions",           "~>3.1"
+=======
+gem "mime-types",                     "~>2.6.1",       :require => "mime/types/columnar"
+>>>>>>> Add Gemfile
 gem "nakayoshi_fork",                 "~>0.0.3"  # provides a more CoW friendly fork (GC a few times before fork)
 gem "net-ldap",                       "~>0.14.0",      :require => false
 gem "net-ping",                       "~>1.7.4",       :require => false
@@ -81,6 +113,7 @@ gem "omniauth",                       "~>1.3.1",       :require => false
 gem "omniauth-google-oauth2",         "~>0.2.6"
 gem "open4",                          "~>1.3.0",       :require => false
 gem "outfielding-jqplot-rails",       "= 1.0.8"
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
 gem "ovirt-engine-sdk",               "~>4.0.6",       :require => false # Required by the oVirt provider
 gem "ovirt_metrics",                  "~>1.4.0",       :require => false
 gem "paperclip",                      "~>4.3.0"
@@ -88,6 +121,13 @@ gem "pg-pglogical",                   "~>1.0.0",       :require => false
 gem "puma",                           "~>3.3.0"
 gem "query_relation",                 "~>0.1.0",       :require => false
 gem "rails",                          "~>5.0.1"
+=======
+gem "ovirt-engine-sdk",               "~>4.0.0",       :require => false # Required by the oVirt provider
+gem "ovirt_metrics",                  "~>1.3.0",       :require => false
+gem "paperclip",                      "~>4.3.0"
+gem "puma",                           "~>3.3.0"
+gem "rails",                          "~>5.0.0"
+>>>>>>> Add Gemfile
 gem "rails-controller-testing",                        :require => false
 gem "rails-i18n",                     "~>5.x"
 gem "recursive-open-struct",          "~>1.0.0"
@@ -96,12 +136,17 @@ gem "ruby-dbus" # For external auth
 gem "ruby-progressbar",               "~>1.7.0",       :require => false
 gem "ruby_parser",                    "~>3.8",         :require => false
 gem "rufus-scheduler",                "~>3.1.3",       :require => false
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
 gem "rugged",                         "=0.25.0b10",    :require => false
+=======
+gem "rugged",                         "~>0.23.0",      :require => false
+>>>>>>> Add Gemfile
 gem "secure_headers",                 "~>3.0.0"
 gem "simple-rss",                     "~>1.3.1",       :require => false
 gem "snmp",                           "~>1.2.0",       :require => false
 gem "sshkey",                         "~>1.8.0",       :require => false
 gem "thin",                           "~>1.7.0",       :require => false
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
 gem "uglifier",                       "~>3.0.0"
 gem "websocket-driver",               "~>0.6.3"
 
@@ -114,6 +159,23 @@ gem "ruport",                         "=1.7.0",                       :git => "h
 gem "uuid"
 gem "xclarity_client"          
 gem "manageiq-providers-lenovo", git: "git://github.com/manageiq/manageiq-providers-lenovo", :branch => "master"
+=======
+gem "uglifier",                       "~>2.7.1",       :require => false
+gem "websocket-driver",               "~>0.6.3"
+
+# Modified gems (forked on Github)
+gem "config",                         "~>1.1.0",                      :git => "git://github.com/ManageIQ/config.git", :branch => "overwrite_arrays"
+gem "deep_merge",                     "~>1.0.1",                      :git => "git://github.com/ManageIQ/deep_merge.git", :branch => "overwrite_arrays"
+gem "foreman_api_client",             ">=0.1.0",   :require => false, :git => "git://github.com/ManageIQ/foreman_api_client.git", :branch => "master"
+gem "ruport",                         "=1.7.0",                       :git => "git://github.com/ManageIQ/ruport.git", :tag => "v1.7.0-3"
+gem "ziya",                           "=2.3.0",    :require => false, :git => "git://github.com/ManageIQ/ziya.git", :tag => "v2.3.0-3"
+
+
+#To Lenovo provider
+gem "uuid"     
+gem "xclarity_client"          , path: "/home/andrey/workspace/xclarity_client"
+gem "manageiq-providers-lenovo", path: "/home/andrey/workspace/manageiq-providers-lenovo"
+>>>>>>> Add Gemfile
 
 # In 1.9.3: Time.parse uses british version dd/mm/yyyy instead of american version mm/dd/yyyy
 # american_date fixes this to be compatible with 1.8.7 until all callers can be converted to the 1.9.3 format prior to parsing.
@@ -128,6 +190,7 @@ end
 group :ui_dependencies do # Added to Bundler.require in config/application.rb
   # Unmodified gems
   gem "angular-ui-bootstrap-rails",   "~>0.13.0"
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
   gem "coffee-rails"
   gem "jquery-hotkeys-rails"
   gem "lodash-rails",                 "~>3.10.0"
@@ -136,6 +199,16 @@ group :ui_dependencies do # Added to Bundler.require in config/application.rb
 
   # Modified gems (forked on Github)
   gem "jquery-rjs",                   "=0.1.1",                       :git => "https://github.com/ManageIQ/jquery-rjs.git", :tag => "v0.1.1-1"
+=======
+  gem "jquery-hotkeys-rails"
+  gem "jquery-rails",                 "~>4.1.1"
+  gem "lodash-rails",                 "~>3.10.0"
+  gem "patternfly-sass",              "~>3.9.0"
+  gem "sass-rails"
+
+  # Modified gems (forked on Github)
+  gem "jquery-rjs",                   "=0.1.1",                       :git => "git://github.com/amatsuda/jquery-rjs.git", :ref => "1288c09"
+>>>>>>> Add Gemfile
 end
 
 ### Start of gems excluded from the appliances.
@@ -144,7 +217,11 @@ end
 #
 unless ENV["APPLIANCE"]
   group :development do
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
     gem "haml_lint",        "~>0.18.0", :require => false
+=======
+    gem "haml_lint",        "~>0.16.1", :require => false
+>>>>>>> Add Gemfile
     gem "rubocop",          "~>0.37.2", :require => false
     gem "scss_lint",        "~>0.48.0", :require => false
   end
@@ -152,6 +229,7 @@ unless ENV["APPLIANCE"]
   group :test do
     gem "brakeman",         "~>3.3",    :require => false
     gem "capybara",         "~>2.5.0",  :require => false
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
     gem "coveralls",                    :require => false
     gem "factory_girl",     "~>4.5.0",  :require => false
     gem "jasmine",                      :require => false
@@ -159,6 +237,10 @@ unless ENV["APPLIANCE"]
     gem "timecop",          "~>0.7.3",  :require => false
     gem "vcr",              "~>3.0.0",  :require => false
     gem "webmock",          "~>1.12",   :require => false
+=======
+    gem "factory_girl",     "~>4.5.0",  :require => false
+    gem "sqlite3",                      :require => false
+>>>>>>> Add Gemfile
   end
 
   group :development, :test do
@@ -167,3 +249,22 @@ unless ENV["APPLIANCE"]
     gem "rspec-rails",      "~>3.5.0"
   end
 end
+<<<<<<< a2e1ecab5c3afef7d85e4b590e8a3623f8b779ce
+=======
+
+#
+# Custom Gemfile modifications
+#
+
+# Load developer specific Gemfile
+#   Developers can create a file called Gemfile.dev.rb containing any gems for
+#   their local development.  This can be any gem under evaluation that other
+#   developers may not need or may not easily install, such as rails-dev-boost,
+#   any git based gem, and compiled gems like rbtrace or memprof.
+dev_gemfile = File.expand_path("Gemfile.dev.rb", __dir__)
+eval_gemfile(dev_gemfile) if File.exist?(dev_gemfile)
+
+# Load other additional Gemfiles
+eval_gemfile(File.expand_path("gems/pending/Gemfile", __dir__))
+Dir.glob("bundler.d/*.rb").each { |f| eval_gemfile(File.expand_path(f, __dir__)) }
+>>>>>>> Add Gemfile
