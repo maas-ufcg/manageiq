@@ -5,7 +5,10 @@ class PhysicalServer < ApplicationRecord
 
   belongs_to :ext_management_system, :foreign_key => :ems_id, :class_name => "ManageIQ::Providers::PhysicalInfraManager"
 
-  has_many  :firmwares
+  def firmwares
+    Firmware.where("ph_server_uuid = ?",  uuid)
+
+  end
 
 
   def name_with_details
