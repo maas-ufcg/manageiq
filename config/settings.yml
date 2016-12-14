@@ -1252,7 +1252,7 @@
       :event_catcher_amazon:
         :poll: 15.seconds
       :event_catcher_lenovo:
-        :poll: 40.seconds
+        :poll: 15.seconds
       :event_catcher_azure:
         :poll: 15.seconds
       :event_catcher_hawkular:
