@@ -43,7 +43,13 @@
     :verbs: *g
     :klass: PhysicalServer
     :subcollections:
-    - :firmwares 
+    - :firmwares
+  :ems_events:
+     :description: LXCA Events
+     :options:
+     - :collection
+     :verbs: *g
+     :klass: EmsEvent
   :firmwares:
     :description: Firmwares
     :options:
@@ -51,7 +57,7 @@
     - :subcollection
     :verbs: *g
     :klass: Firmware
-    :identifier: firmwares 
+    :identifier: firmwares
   :accounts:
     :description: Accounts
     :options:
