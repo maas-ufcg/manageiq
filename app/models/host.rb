@@ -97,6 +97,8 @@ class Host < ApplicationRecord
   has_many                  :host_aggregates, :through => :host_aggregate_hosts
 
 
+  has_one :host,  :foreign_key  =>  "serialNumber", :primary_key  =>  "service_tag"
+
   serialize :settings, Hash
 
   # TODO: Remove all callers of address
