@@ -4,6 +4,7 @@
 
 require File.expand_path('../config/application', __FILE__)
 require File.expand_path('../lib/tasks/evm_rake_helper', __FILE__)
+require 'ci/reporter/rake/rspec'
 
 include Rake::DSL
 Vmdb::Application.load_tasks
@@ -14,6 +15,8 @@ begin
 rescue LoadError
   # Do nothing because we don't need jasmine in every environment
 end
+
+task :rspec => 'ci:setup:rspec'
 
 # Clear noisy and unusable tasks added by rspec-rails
 if defined?(RSpec)
