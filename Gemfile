@@ -14,7 +14,7 @@ gem "acts_as_list",                   "~>0.7.2"
 gem "acts_as_tree",                   "~>2.1.0" # acts_as_tree needs to be required so that it loads before ancestry
 gem "ancestry",                       "~>2.1.0",       :require => false
 gem "ansible_tower_client",           "~>0.3.2",       :require => false
-gem "aws-sdk",                        "~>2.2.19",      :require => false
+gem "aws-sdk",                        '~> 2.6.14',     :require => false
 gem "color",                          "~>1.8"
 gem "dalli",                          "~>2.7.4",       :require => false
 gem "draper",                         "~>3.0.0.pre1"
@@ -47,7 +47,7 @@ gem "ovirt-engine-sdk",               "~>4.0.0",       :require => false # Requi
 gem "ovirt_metrics",                  "~>1.3.0",       :require => false
 gem "paperclip",                      "~>4.3.0"
 gem "puma",                           "~>3.3.0"
-gem "rails",                          "~>5.0.0"
+gem "rails",                          "~>5.0.0", ">= 5.0.0.1", "< 5.0.1"
 gem "rails-controller-testing",                        :require => false
 gem "rails-i18n",                     "~>5.x"
 gem "recursive-open-struct",          "~>1.0.0"
