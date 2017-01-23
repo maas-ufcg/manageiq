@@ -12,4 +12,10 @@ class PhysicalServer < ApplicationRecord
       :name => name,
     }
   end
+
+  def name
+    "PhysicalServer".freeze
+  
+  end
+
 end
