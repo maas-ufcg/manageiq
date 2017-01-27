@@ -200,3 +200,7 @@ containerreplicator_compliance_check,Replicator Compliance Check,Default,complia
 containerreplicator_compliance_passed,Replicator Compliance Passed,Default,compliance
 containerreplicator_compliance_failed,Replicator Compliance Failed,Default,compliance
 
+#
+# Physical Server
+#
+physicalserver_turn_on,Server Turned On,Default,physical_server

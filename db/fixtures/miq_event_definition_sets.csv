@@ -11,3 +11,4 @@ service_process,Service Lifecycle
 storage_operational, Datastore Operation
 auth_validation,Authentication Validation
 container_operations,Container Operation
+physical_server,Physical Server
