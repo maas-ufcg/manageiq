@@ -205,3 +205,8 @@ containerreplicator_compliance_failed,Replicator Compliance Failed,Default,compl
 extmanagementsystem_compliance_check,ExtManagementSystem Compliance Check,Default,compliance
 extmanagementsystem_compliance_passed,ExtManagementSystem Compliance Passed,Default,compliance
 extmanagementsystem_compliance_failed,ExtManagementSystem Compliance Failed,Default,compliance
+
+#
+# Physical Server
+#
+physical_server_turned_on,Physical Server Turned On,Default,physical_server
